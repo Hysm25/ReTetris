@@ -8,9 +8,15 @@ updated: 2026-11-20
 ## 1. Project Context & Objectives
 - **Clean-Room ReTetris**: Faithful, clean-room 1989 NES Tetris re-implementation built with Godot 4.3+ and strictly typed GDScript.
 - **Simulation Target**: Frame-accurate NTSC 60Hz NES Tetris (Nintendo version, Nov 1989) running on a deterministic 60 TPS `_physics_process` loop.
-- **Legal & Asset Boundary**: Strictly zero copyrighted assets committed to version control.
-  - Fallback: Clean-room procedural 8x8 pixel tile generator (GDScript `Image` / `ImageTexture`) + procedural 2A03 APU square/triangle/noise sound synthesis.
-  - Optional ROM Ingestion: Pure GDScript 2bpp CHR-ROM parser extracting original tile graphics from user-provided `user://nes_data/tetris.nes`.
+- **Legal Boundary & Mandatory ROM Ingestion**:
+  - **Zero Copyrighted Assets in Git**: Absolutely zero proprietary ROM binaries, CHR dumps, PRG code, audio recordings, or copyrighted graphics are committed to version control.
+  - **Mandatory ROM Ingestion (Zero Procedural Fallbacks)**: Procedural tile synthesis and procedural audio approximations are strictly prohibited in the final architecture. The engine refuses to initialize gameplay unless a valid user-provided `tetris.nes` ROM is present in `user://nes_data/` (or workspace root for auto-extraction).
+  - **Missing ROM Screen**: If extracted assets are missing and no ROM is found, the runtime halts initialization and displays a dedicated setup screen instructing the user where to supply `tetris.nes`.
+  - **100% Data & Asset Extraction**:
+    - The importer validates the ROM via SHA-256 / CRC32 checksums.
+    - Extracts 100% of authentic game graphics from 16KB CHR-ROM (tiles, font glyphs, borders, menus, ending sprites).
+    - Extracts 100% of authentic game tables from PRG-ROM (palettes at `$984C`, gravity timing tables, BPS scoring values, spawn orientations, preview offsets).
+    - Extracts 100% of authentic APU sound tables, note durations, envelope streams, and BGM tracks from PRG-ROM sound data.
 - **Reference Disassembly**:
   - The repository includes a local disassembly reference (`TetrisNESDisasm/`) and local test ROM (`Tetris (USA).nes`, git-ignored).
   - Used strictly for reverse-engineering validation of authentic timings, RNG mechanics, RAM addresses, and formulas without incorporating proprietary code into the clean-room engine.
@@ -42,11 +48,16 @@ updated: 2026-11-20
   - `physics_ticks_per_second` is locked to 60.
 - **Strict Static Typing**:
   - Strict typing is mandatory for all variables, constants, function arguments, and return types. No untyped signatures allowed.
+- **Mandatory ROM Ingestion & Zero Hardcoded Approximations**:
+  - All visual assets (tiles, fonts, UI borders), color palettes, gravity frame counters, scoring multipliers, APU register envelopes, and music tracks must be sourced from authentic ROM bytes extracted into `user://nes_data/`.
+  - Procedural fallbacks and hardcoded approximation tables are completely removed.
+- **Startup Gate & ROM Guard**:
+  - On startup, the engine verifies the presence of extracted data in `user://nes_data/`. If missing, it checks for `tetris.nes` to auto-extract. If no ROM is present, gameplay refuses to start, and the engine displays a Missing ROM prompt.
 - **Composition Over Inheritance & No God Objects**:
-  - Systems are decoupled into specialized components: `BoardGrid`, `DASHandler`, `PieceController`, `ScoreManager`, `PlayfieldRenderer`, and `AudioManager`.
+  - Systems are decoupled into specialized components: `BoardGrid`, `DASHandler`, `PieceController`, `ScoreManager`, `PlayfieldRenderer`, `AudioManager`, and `CHRExtractor`.
 - **Autoload Singletons**:
   1. `EventBus` (`res://src/core/event_bus.gd`): Typed global event dispatcher.
-  2. `ContentRegistry` (`res://src/core/content_registry.gd`): Ingests tables, palettes, matrices, and tile textures.
+  2. `ContentRegistry` (`res://src/core/content_registry.gd`): Ingests extracted tables, palettes, matrices, and tile textures.
 - **Authentic NES Tetris Specifications**:
   - **Grid**: 10 columns x 22 rows (Rows 0-1 hidden spawn buffer, Rows 2-21 visible playfield).
   - **Randomizer**: Authentic 1989 two-roll piece generation (Roll 1: 0..7, if duplicate of previous or 7, Roll 2: 0..6; yields ~3.57% duplicate rate).
@@ -68,30 +79,19 @@ updated: 2026-11-20
   - `docs/USER.md`
   - `docs/SOUL.md`
 - Integrated local reference disassembly (`TetrisNESDisasm/`) for reverse engineering and parameter validation.
-- Authored comprehensive project documentation:
-  - `docs/ARCHITECTURE.md`: Exhaustive 1989 NES Tetris specification (geometry, two-roll RNG, NRS, DAS, gravity/ARE timing, scoring, procedural generation fallback, and optional 2bpp CHR-ROM extractor).
-  - `docs/MEMORY.md`: Hardware constraints (AVX-only Sandy Bridge, Termux PRoot ARM64, `fish` shell) and architectural invariants.
-  - `docs/STATUS.md`: Phase 1 roadmap checklist for implementation and headless verification.
-  - `README.md`: Repository scope, architecture overview, and build instructions.
 - Configured baseline `project.godot`:
   - `gl_compatibility` renderer for low-overhead execution on both Intel HD graphics and mobile Adreno 710.
   - Native 256x240 viewport resolution with integer scaling override (768x720, 3x scale).
   - Nearest-neighbor texture filter (`default_texture_filter = 0`).
   - 60 TPS physics tick rate.
-- **Current Execution Status**:
-  - **Milestone 1 Completed**: Core Autoloads & Enums (`src/core/constants.gd`, `src/core/event_bus.gd`, `src/core/content_registry.gd`).
-  - **Milestone 2 Completed**: Gameplay Simulation Components (`src/game/piece_randomizer.gd`, `src/game/board_grid.gd`, `src/game/das_handler.gd`, `src/game/piece_controller.gd`, `src/game/score_manager.gd`, `src/game/game_state_machine.gd`).
-  - **Milestone 3 Completed**: Rendering, Audio & Importer (`src/game/playfield_renderer.gd`, `src/audio/audio_manager.gd`, `src/importer/chr_extractor.gd`, `src/main.gd`, `src/main.tscn`).
+- **Phase 1 Baseline Completion**:
+  - **Milestone 1 Completed**: Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`).
+  - **Milestone 2 Completed**: Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, `piece_controller.gd`, `score_manager.gd`, `game_state_machine.gd`).
+  - **Milestone 3 Completed**: Rendering, Audio & Importer (`playfield_renderer.gd`, `audio_manager.gd`, `chr_extractor.gd`, `main.gd`, `main.tscn`).
   - **Headless Verification**: Executed and verified headlessly via `godot --headless --path . --quit` and `godot --headless -s tests/test_runner.gd` (Godot 4.7.1 on Fedora PRoot ARM64), running 10 comprehensive automated test suites (`test_core.gd`, `test_randomizer.gd`, `test_board_grid.gd`, `test_das.gd`, `test_piece_controller.gd`, `test_score_manager.gd`, `test_game_simulation.gd`, `test_renderer.gd`, `test_audio.gd`, `test_importer.gd`) passing 100% of assertions with zero errors or warnings.
-  - **Key Features Verified**:
-    1. `PieceRandomizer`: Authentic 1989 two-roll pseudo-randomizer yielding a verified 3.55% duplicate rate across 100,000 rolls (matching theoretical $1/28 \approx 3.571\%$) and uniform 1/7 piece spread.
-    2. `BoardGrid`: 10x22 grid storage, fast bounds checking, zero-kick placement queries, piece locking, full-row detection, authentic 5-step center-outward row clearing, and multi-row collapse.
-    3. `DASHandler`: 16-frame initial charge, 6-frame repeat interval (reloaded to 10), directional reversal reset, and ARE/line-clear pre-charging preservation.
-    4. `PieceController`: Horizontal translation, NRS rotation strictly rejecting wall/floor kicks, 60 TPS gravity timers across levels 0–29+, 2-frame soft-drop step (+1 point per cell), mino positions query (`get_mino_positions`), and instant contact lock without grace periods.
-    5. `ScoreManager`: BPS scoring ($40, 100, 300, 1200 \times (\text{level} + 1)$), soft-drop accumulation, starting level thresholds ($\min(S \times 10 + 10, \max(100, S \times 10 - 50))$), and 10-line transitions.
-    6. `GameStateMachine`: 60 TPS deterministic finite state machine (`SPAWNING`, `ACTIVE_PLAY`, `LINE_CLEAR_ANIM`, `ARE_DELAY`, `GAME_OVER`), base ARE calculation ($10 + 2 \times \lfloor(21 - Y_{\text{lock}})/4\rfloor$), 20-frame line clear anim, and topout detection.
-    7. `PlayfieldRenderer`: Pixel-perfect 256x240 viewport CanvasItem renderer, 10x20 visible playfield bounding box at (X: 96, Y: 40), locked mino cells mapped to level palettes, active piece rendering, preview box at (X: 192, Y: 112) with authentic anchor offsets, HUD text rendering (Lines, Top, Score, Level, Statistics), and Game Over banner.
-    8. `AudioManager`: 100% clean-room procedural 2A03 APU audio synthesizer (Pulse, Triangle, Noise channels) using `AudioStreamGenerator`, authentic SFX envelopes (`SHIFT`, `ROTATE`, `LOCK`, `LINE_CLEAR`, `TETRIS`, `LEVEL_UP`, `GAME_OVER`), real-time streaming, and headless synthesis buffers.
-    9. `CHRExtractor`: Pure GDScript iNES header parsing (`NES\x1A`), 2bpp planar tile decoding, 128x128 bank sheet and 8x8 tile image generation, PRG-ROM palette extraction (CPU $984C / ROM offset 0x00185C), and `apply_to_content_registry` texture injection.
-    10. `Main Scene`: Root scene coordinator (`src/main.gd`, `src/main.tscn`) wiring state machine, renderer, and audio manager to the 60 TPS simulation loop.
-  - **Next Target**: Phase 2: Menu Flow, Title Screen, Game Type A/B Selection, Music Selection & High Scores.
+- **Architectural Refactor Decision: Mandatory ROM Ingestion Architecture**:
+  - Decision to eliminate all procedural tile generation fallbacks and procedural audio approximations.
+  - Runtime strictly enforces presence of authentic ROM data (`user://nes_data/` or `tetris.nes`) and refuses to start without it.
+  - Importer extracts 100% of authentic CHR pattern tables (tiles, font glyphs, frames, menus, ending sprites), PRG lookup tables (palettes, gravity, scores, spawn/preview coordinates), and APU sound tables/bytecode.
+  - Missing ROM on startup halts gameplay initialization and presents an explicit setup screen.
+  - Next target milestone: **Phase 1.5: Mandatory ROM Asset & Data Ingestion Refactor**.

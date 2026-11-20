@@ -1,7 +1,7 @@
 # Project Architecture (`docs/ARCHITECTURE.md`)
 
 > **Project**: Clean-Room Re-implementation of 1989 NES Tetris in **Godot 4.3+ (Strictly Typed GDScript)**.  
-> **Goal**: 100% faithful, frame-accurate NTSC 60Hz NES Tetris simulation with zero copyrighted Nintendo or Bullet-Proof Software assets, featuring a deterministic 60 TPS physics process, procedural pixel tile generation, and an optional 2bpp CHR-ROM asset extraction pipeline.
+> **Goal**: 100% faithful, frame-accurate NTSC 60Hz NES Tetris simulation with zero copyrighted Nintendo or Bullet-Proof Software assets committed to version control, featuring a deterministic 60 TPS physics process and a **Mandatory ROM Asset & Data Ingestion Architecture** (zero procedural fallbacks).
 
 ---
 
@@ -12,41 +12,59 @@ This project is an independent clean-room software re-implementation created str
 ### Reference Disassembly
 - The workspace includes a local disassembly reference (`TetrisNESDisasm/`) derived from the original 1989 NES binary.
 - This disassembly is utilized strictly for reverse-engineering verification of authentic mechanics (randomizer logic, frame gravity tables, ARE timing counters, DAS behavior, and scoring formulas).
-- Absolutely zero binary assets or proprietary code from `TetrisNESDisasm/` are packaged or compiled into the engine runtime.
+- Absolutely zero binary assets, proprietary graphics, or proprietary audio code from `TetrisNESDisasm/` are packaged or committed into the repository.
 
-### Boundary Invariants
+### Boundary Invariants & Mandatory ROM Ingestion
 1. **Zero Copyrighted Assets in Repository**:
    - Absolutely no proprietary Nintendo / Bullet-Proof Software ROMs, CHR dumps, PRG code, music recordings, or copyrighted graphics are committed to version control.
-   - Git ignores all ROM binaries (`*.nes`, `*.fds`, `*.bin`, `*.rom`, `*.sav`) and runtime data directories (`user://nes_data/`, `extracted/`).
-2. **Dual Asset Pipeline**:
-   - **Path A — Clean-Room Procedural Generation (Default Fallback)**:
-     - Algorithmic generation of authentic 8x8 pixel tiles (bevelled block, gem block, square block) directly in GDScript via `Image` and `ImageTexture`.
-     - Algorithmic procedural audio synthesis (simulating the 2A03 APU pulse, triangle, and noise channels) or royalty-free clean WAV SFX.
-     - The game is 100% playable out-of-the-box without requiring any external files.
-   - **Path B — Optional User ROM Ingestion (`user://nes_data/`)**:
-     - Users may optionally place a legally dumped `tetris.nes` file into `user://nes_data/`.
-     - An integrated pure-GDScript CHR-ROM extractor parses the iNES header, locates the 8KB CHR-ROM bank, unpacks 2bpp planar NES tile graphics, maps them to authentic palettes, and caches the extracted textures locally.
+   - Git strictly ignores all ROM binaries (`*.nes`, `*.fds`, `*.bin`, `*.rom`, `*.sav`) and runtime data directories (`user://nes_data/`, `extracted/`).
+2. **Mandatory ROM Asset & Data Ingestion (Zero Procedural Fallbacks)**:
+   - **No Procedural Fallbacks**: All procedural tile generation and procedural audio synthesis fallbacks are eliminated. The engine contains zero hardcoded approximations of ROM assets or tables.
+   - **Runtime Requirement**: The engine **strictly refuses to start gameplay** unless a valid user-provided 1989 NES Tetris ROM (`tetris.nes`) is located and imported into `user://nes_data/`.
+   - **Startup Guard & Missing ROM Screen**: If `user://nes_data/` is missing extracted assets (and no `tetris.nes` is found in the workspace or data directory to auto-extract from), the game immediately halts initialization and displays a clear setup prompt directing the player where to place their ROM.
+3. **100% Authentic Extraction Pipeline (`src/importer/`)**:
+   - The importer validates the ROM via cryptographic checksums (SHA-256 and CRC32) against authentic 1989 NTSC NES Tetris releases:
+     - PRG-ROM (32KB): SHA-256 `a2de35dfa7333b0458762a1485fb612b6bdc9b5a15269f0fcf5a6be67c0d89de` / CRC32 `0x943DFBBE`
+     - CHR-ROM (16KB): SHA-256 `23789834e66947081aa5d34efe092beb69a91273abc62089a8bb7c00f67ff751` / CRC32 `0x251AF21C`
+   - Upon verification, the importer extracts 100% of authentic game data into `user://nes_data/`:
+     - **Graphics (CHR-ROM)**: Unpacks all 16KB of 2bpp planar pattern tables into PNG texture atlases (playfield minos, frame borders, NES bitmap font glyphs, title screen/menu graphics, and rocket/ending sequence sprites).
+     - **Palettes & Lookup Tables (PRG-ROM)**: Extracts exact level color palettes (`$984C`), gravity frame tables, BPS scoring values, piece spawn orientations, and preview coordinate offsets directly from PRG-ROM.
+     - **Audio Data (PRG-ROM / 2A03 APU Data)**: Extracts exact APU register sequences, pitch lookup tables, note duration tables, envelope streams, and complete music tracks (Music 1 / Korobeiniki, Music 2, Music 3, High Score, Ending) directly from ROM sound engine tables.
 
 ```
-+-----------------------------------------------------------------------+
-|                         Legal Asset Pipeline                          |
-|                                                                       |
-|  +---------------------------+       +-----------------------------+  |
-|  | Procedural Tile Generator |       | Optional: user://nes_data/  |  |
-|  | (Clean-Room 8x8 GDScript) |       | (User-provided tetris.nes)  |  |
-|  +-------------+-------------+       +--------------+--------------+  |
-|                |                                    |                 |
-|                |                                    v                 |
-|                |                     +-----------------------------+  |
-|                |                     | CHR-ROM 2bpp Tile Extractor |  |
-|                |                     | (Pure GDScript / iNES)      |  |
-|                |                     +--------------+--------------+  |
-|                |                                    |                 |
-|                v                                    v                 |
-|  +-----------------------------------------------------------------+  |
-|  |             ContentRegistry (Texture & Palette Bank)             |  |
-|  +-----------------------------------------------------------------+  |
-+-----------------------------------------------------------------------+
++-----------------------------------------------------------------------------------+
+|                        Mandatory ROM Ingestion Pipeline                           |
+|                                                                                   |
+|  +-------------------------------------+                                          |
+|  | User-Provided tetris.nes            |                                          |
+|  | (user://nes_data/ or workspace root)|                                          |
+|  +------------------+------------------+                                          |
+|                     |                                                             |
+|                     v                                                             |
+|  +-------------------------------------+        NO                                |
+|  | Importer Checksum & Header Validator| -----------------> [ Missing ROM Screen ] |
+|  | (SHA-256 / CRC32 Check)             |                    [ Halt Initialization ]|
+|  +------------------+------------------+                                          |
+|                     | YES                                                         |
+|                     v                                                             |
+|  +-------------------------------------+                                          |
+|  | 100% Data Extraction Pipeline       |                                          |
+|  |  * CHR: 2bpp Planar Tiles & Fonts   |                                          |
+|  |  * PRG: Palettes, Gravity & Scores  |                                          |
+|  |  * PRG: APU Sequences & BGM Tracks  |                                          |
+|  +------------------+------------------+                                          |
+|                     |                                                             |
+|                     v                                                             |
+|  +-------------------------------------+                                          |
+|  | ContentRegistry & AudioManager      |                                          |
+|  | (100% Authentic Runtime Assets)     |                                          |
+|  +------------------+------------------+                                          |
+|                     |                                                             |
+|                     v                                                             |
+|  +-------------------------------------+                                          |
+|  | Frame-Accurate Simulation & Game    |                                          |
+|  +-------------------------------------+                                          |
++-----------------------------------------------------------------------------------+
 ```
 
 ---
@@ -73,7 +91,7 @@ The engine is calibrated to replicate the exact timing and visual geometry of th
 - **Dimensions**: 10 columns (X: 0..9) by 22 rows (Y: 0..21).
   - Rows 0 and 1: Hidden spawn rows (used for tetromino entry and game-over lockout).
   - Rows 2 through 21: The 20 visible rows rendered on screen.
-- **Cell Representation**: Integer enum or tile ID:
+- **Cell Representation**:
   - `0`: Empty.
   - `1`: Block Type A (Primary palette color).
   - `2`: Block Type B (Secondary palette color).
@@ -115,8 +133,8 @@ DAS governs horizontal movement timing:
   - If a player holds a direction during ARE, the counter continues to count, allowing the piece to move immediately upon spawning if the counter reaches 16.
 - **Direction Reversal**: Changing direction immediately resets the DAS counter to 0.
 
-### 3.5 Gravity Timing Table
-Gravity determines the number of frames per single-cell downward drop based on the current level:
+### 3.5 Gravity Timing Table (Extracted from PRG-ROM)
+Gravity determines the number of frames per single-cell downward drop based on the current level, extracted directly from PRG-ROM:
 
 | Level | Frames per Drop | Speed (Cells/sec at 60Hz) |
 | :--- | :--- | :--- |
@@ -173,8 +191,8 @@ After a piece locks, there is an entry delay before the next piece enters the pl
     - If starting at Level 19: Transition at 140 lines.
   - After $\text{Threshold}_0$ is reached, every subsequent level transition requires clearing exactly **10 lines**.
 
-### 3.9 Level Palette Cycling
-The color scheme shifts every level based on the last digit of the level number ($\text{Level} \pmod{10}$):
+### 3.9 Level Palette Cycling (Extracted from PRG-ROM CPU $984C)
+The color scheme shifts every level based on the last digit of the level number ($\text{Level} \pmod{10}$), extracted directly from PRG-ROM offset `0x00185C`:
 
 | Level Digit | Primary Color | Secondary Color | Tertiary Color |
 | :---: | :--- | :--- | :--- |
@@ -198,38 +216,49 @@ The color scheme shifts every level based on the last digit of the level number 
    - All core gameplay logic (gravity counters, DAS timers, ARE phases, piece movement, line collapse) runs strictly inside `_physics_process(delta)` where `delta == 1.0 / 60.0`.
    - `_process(delta)` is reserved solely for UI smoothing or rendering interpolations if needed.
 2. **Strict Static Typing**:
-   - Untyped variables, parameters, or return signatures are strictly prohibited (e.g. `var speed := 0` or `var speed: int = 0`, `func update() -> void:`).
-3. **Composition Over Inheritance**:
-   - Distinct systems are decoupled into focused nodes and utility classes rather than a monolithic hierarchy.
-4. **No God Objects**:
-   - `Main.gd` coordinates top-level orchestration and scene attachment only. State, physics, scoring, rendering, and input are encapsulated in dedicated modules.
+   - Untyped variables, parameters, or return signatures are strictly prohibited (e.g. `var speed: int = 0`, `func update() -> void:`).
+3. **Mandatory ROM Data Dependency**:
+   - Systems depend on validated, extracted ROM data.
+   - If extracted assets are missing, simulation refuses to start and displays the ROM setup prompt.
+4. **Composition Over Inheritance & No God Objects**:
+   - Systems are decoupled into modular components rather than a monolithic hierarchy. Top-level scenes coordinate orchestration only.
 
 ```
                            +-------------------+
                            |    Main Scene     |
                            +---------+---------+
                                      |
-      +----------------+-------------+------------+----------------+
-      |                |                          |                |
-      v                v                          v                v
-+-----------+  +---------------+          +---------------+  +------------+
-| BoardGrid |  |PieceController|          | ScoreManager  |  |PlayfieldR..|
-+-----+-----+  +-------+-------+          +-------+-------+  +-----+------+
-      |                |                          |                |
-      +----------------+------------+-------------+----------------+
+                                     v
+                           +-------------------+
+                           | ROM Setup Guard   | (Halts if ROM missing)
+                           +---------+---------+
+                                     |
+       +----------------+------------+------------+----------------+
+       |                |                         |                |
+       v                v                         v                v
+ +-----------+  +---------------+         +---------------+  +------------+
+ | BoardGrid |  |PieceController|         | ScoreManager  |  |PlayfieldR..|
+ +-----+-----+  +-------+-------+         +-------+-------+  +-----+------+
+       |                |                         |                |
+       +----------------+-----------+-------------+----------------+
                                     |
                                     v (Signals)
                            +-------------------+
                            |     EventBus      |
                            +-------------------+
                                     ^
-                                    | (Lookups)
+                                    | (Ingests)
                            +-------------------+
                            |  ContentRegistry  |
+                           +---------+---------+
+                                     ^
+                                     | (Populates)
+                           +---------+---------+
+                           |   CHRExtractor    | (user://nes_data/)
                            +-------------------+
 ```
 
-### 4.2 Planned Autoload Singletons
+### 4.2 Autoload Singletons
 
 #### 1. `EventBus` (`res://src/core/event_bus.gd`)
 Decoupled typed signal bus for engine-wide state notifications:
@@ -248,46 +277,48 @@ signal game_restarted()
 ```
 
 #### 2. `ContentRegistry` (`res://src/core/content_registry.gd`)
-Central repository for static game tables, tetromino matrices, palettes, and tile textures:
-- Tetromino rotation offsets: 4 orientations $\times$ 4 coordinates for each of the 7 pieces.
-- Authentic gravity lookup tables.
-- NES 64-color master palette & per-level palette mappings.
-- Active tile textures (procedurally generated or CHR-ROM extracted).
+Central repository for authentic ROM tables, tetromino matrices, palettes, and tile textures:
+- Ingests extracted PRG-ROM tables: gravity lookup table, scoring multipliers, level palettes (`$984C`), and piece spawn orientations.
+- Stores extracted CHR-ROM pattern sheets: playfield mino blocks, UI frames, borders, and NES font glyphs.
+- Strictly guards against uninitialized access: raises explicit errors if extracted ROM data is not loaded.
 
-### 4.3 Planned Target Module Responsibilities
+### 4.3 Module Responsibilities
 
 1. **`BoardGrid` (`src/game/board_grid.gd`)**:
    - Encapsulates the 10x22 grid matrix.
-   - Manages bounds validation, cell occupancy queries, piece placement, line completion detection, and line collapse.
+   - Manages bounds validation, cell occupancy queries, piece placement, line completion detection, and linear row collapse.
 2. **`DASHandler` (`src/game/das_handler.gd`)**:
    - Tracks directional input frames (Left/Right).
    - Manages the 16-frame charge and 6-frame repeat intervals.
-   - Preserves DAS state across piece transitions and ARE delays.
+   - Preserves DAS charge across piece transitions and ARE delays.
 3. **`PieceController` (`src/game/piece_controller.gd`)**:
    - Manages active piece state (type, grid position, orientation).
-   - Advances gravity counters using level timing tables.
+   - Advances gravity counters using extracted PRG-ROM gravity timing tables.
    - Handles soft drop input and validates rotation/translation via `BoardGrid`.
    - Triggers piece lock and signals `EventBus`.
 4. **`ScoreManager` (`src/game/score_manager.gd`)**:
    - Implements authentic BPS scoring, lines cleared tracking, and starting level transition formulas.
 5. **`PlayfieldRenderer` (`src/game/playfield_renderer.gd`)**:
-   - Renders the 10x20 visible matrix, active piece, next-piece preview, and 5-step center-outward line clear animation using 8x8 tile textures.
+   - Renders the 10x20 visible matrix, active piece, next-piece preview, and 5-step center-outward line clear animation using authentic CHR-ROM extracted textures and NES font glyphs.
+   - Renders the Missing ROM Setup Screen when assets are absent.
 6. **`AudioManager` (`src/audio/audio_manager.gd`)**:
-   - Procedural synthesis or sound-bank playback for piece movement blips, rotation clicks, drop thuds, line-clear chirps, and game-over jingles.
-7. **`CHR2BPPExtractor` (`src/importer/chr_extractor.gd`)**:
-   - Pure GDScript parser for optional user-provided `.nes` files.
-   - Decodes 2bpp bitplanes into indexed 8x8 `Image` textures.
+   - Emulates 2A03 APU pulse, triangle, and noise channels.
+   - Driven 100% by authentic PRG-ROM sound data tables, note pitch sequences, envelope timings, and music stream bytecode extracted from the ROM.
+7. **`CHRExtractor` / `ROMImporter` (`src/importer/chr_extractor.gd`)**:
+   - Cryptographically verifies user-supplied `tetris.nes` via SHA-256 / CRC32 checksums.
+   - Decodes 2bpp bitplanes into indexed 8x8 and 128x128 PNG atlases.
+   - Extracts PRG-ROM palettes, game lookup tables, and APU music/SFX data structures into `user://nes_data/`.
 
 ---
 
-## 5. Planned Target Directory Layout
+## 5. Directory Layout
 
 ```text
 res://
 ├── project.godot                     # Godot 4.3 project configuration (GL Compatibility)
 ├── .editorconfig                     # Editor formatting standards
 ├── .gitattributes                    # Git line-ending normalization
-├── .gitignore                        # Clean-room asset boundaries & Godot ignores
+├── .gitignore                        # Clean-room asset boundaries (Excludes *.nes and runtime dumps)
 ├── AGENTS.md                         # Global agent execution blueprint (Untouched)
 ├── README.md                         # Clean-room project overview & instructions
 ├── TetrisNESDisasm/                  # Local reference disassembly (Reverse-engineering reference)
@@ -299,27 +330,33 @@ res://
 │   └── SOUL.md                       # Assistant persona & execution rules (Untouched)
 ├── src/
 │   ├── core/
-│   │   ├── constants.gd              # [Planned] Game enums, dimensions, scoring tables, timings
-│   │   ├── event_bus.gd              # [Stub] Typed signal dispatcher
-│   │   └── content_registry.gd       # [Stub] Tetromino matrices, palettes, textures
+│   │   ├── constants.gd              # Game enums, dimensions, timings, and formula specifications
+│   │   ├── event_bus.gd              # Typed global signal dispatcher
+│   │   └── content_registry.gd       # ROM table repository & extracted texture manager
 │   ├── game/
-│   │   ├── board_grid.gd             # [Planned] 10x22 grid state & collision queries
-│   │   ├── das_handler.gd            # [Planned] Frame-accurate 16/6 DAS input handler
-│   │   ├── piece_controller.gd       # [Planned] Active tetromino state & gravity simulation
-│   │   ├── piece_randomizer.gd       # [Planned] 1989 two-roll randomizer implementation
-│   │   ├── score_manager.gd          # [Planned] Authentic scoring & level transitions
-│   │   ├── playfield_renderer.gd     # [Planned] 256x240 canvas item & 8x8 tile renderer
-│   │   └── game_state_machine.gd     # [Planned] Play, ARE, LineClear, GameOver states
+│   │   ├── board_grid.gd             # 10x22 grid state & collision queries
+│   │   ├── das_handler.gd            # Frame-accurate 16/6 DAS input handler
+│   │   ├── piece_controller.gd       # Active tetromino state & gravity simulation
+│   │   ├── piece_randomizer.gd       # 1989 two-roll randomizer implementation
+│   │   ├── score_manager.gd          # Authentic scoring & level transitions
+│   │   ├── playfield_renderer.gd     # 256x240 canvas item & CHR-ROM tile renderer
+│   │   └── game_state_machine.gd     # Play, ARE, LineClear, GameOver, and ROM_Setup states
 │   ├── audio/
-│   │   └── audio_manager.gd          # [Planned] Sound dispatcher & procedural APU synthesizer
+│   │   └── audio_manager.gd          # 2A03 APU synthesizer driven by authentic PRG-ROM sound tables
 │   ├── importer/
-│   │   └── chr_extractor.gd          # [Planned] Pure GDScript iNES header & 2bpp CHR-ROM parser
-│   └── main.tscn                     # [Stub] Root scene placeholder
+│   │   └── chr_extractor.gd          # Pure GDScript iNES header & PRG/CHR-ROM extractor
+│   ├── main.gd                       # Root scene coordinator & ROM startup guard
+│   └── main.tscn                     # Root scene entry point
 └── tests/
-    ├── test_runner.gd                # [Planned] Headless verification harness
-    ├── test_randomizer.gd            # [Planned] Verification of 1989 piece distribution
-    ├── test_gravity_timing.gd        # [Planned] Verification of frame-accurate gravity drops
-    ├── test_das.gd                   # [Planned] Verification of 16-frame charge & 6-frame repeat
-    ├── test_nrs_rotation.gd          # [Planned] Verification of NRS rotation & kick absence
-    └── test_scoring.gd               # [Planned] Verification of BPS scoring & level transitions
+    ├── test_runner.gd                # Headless verification harness (10+ test suites)
+    ├── test_core.gd                  # Verification of core enums, timings, and events
+    ├── test_randomizer.gd            # Verification of 1989 two-roll piece distribution
+    ├── test_board_grid.gd            # Verification of grid occupancy and line clears
+    ├── test_das.gd                   # Verification of 16-frame charge & 6-frame repeat
+    ├── test_piece_controller.gd      # Verification of movement, NRS rotation & contact lock
+    ├── test_score_manager.gd         # Verification of BPS scoring & level transitions
+    ├── test_game_simulation.gd       # Verification of deterministic 60 TPS state transitions
+    ├── test_renderer.gd              # Verification of viewport offsets & preview positioning
+    ├── test_audio.gd                 # Verification of APU channels & SFX synthesis
+    └── test_importer.gd              # Verification of 2bpp planar decoder & ROM extraction
 ```
