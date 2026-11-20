@@ -54,6 +54,45 @@ const BUTTON_DOWN: int = 0x04
 const BUTTON_LEFT: int = 0x02
 const BUTTON_RIGHT: int = 0x01
 
+# --- Game Modes & Menu Navigation ---
+enum GameType {
+	TYPE_A = 0,
+	TYPE_B = 1,
+}
+
+enum MusicType {
+	MUSIC_1 = 0, # Korobeiniki
+	MUSIC_2 = 1,
+	MUSIC_3 = 2,
+	OFF = 3,
+}
+
+enum MenuMode {
+	NONE = 0,
+	TITLE_SCREEN = 1,
+	GAME_TYPE_MENU = 2,
+	LEVEL_MENU = 3,
+	IN_GAME = 4,
+}
+
+# Type B Mode Configurations
+const TYPE_B_GOAL_LINES: int = 25
+const TYPE_B_GARBAGE_ROWS: Array[int] = [0, 3, 5, 8, 10, 12] # Heights 0..5
+const TYPE_B_RNG_TABLE: Array[int] = [
+	0, # EMPTY
+	1, # PRIMARY
+	0, # EMPTY
+	2, # SECONDARY
+	3, # TERTIARY
+	3, # TERTIARY
+	0, # EMPTY
+	0, # EMPTY
+]
+
+# Audio Menu SFX Identifiers
+const SFX_CURSOR: int = 7
+const SFX_MENU_START: int = 8
+
 # --- Tetromino Types ---
 enum PieceType {
 	T = 0,

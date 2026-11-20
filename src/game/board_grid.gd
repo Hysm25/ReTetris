@@ -136,3 +136,30 @@ func collapse_rows(completed_rows: Array[int]) -> void:
 		for x in range(Constants.GRID_COLUMNS):
 			cells[write_y * Constants.GRID_COLUMNS + x] = Constants.TileType.EMPTY
 		write_y -= 1
+
+## Populates Type B starting garbage based on selected height (0 to 5).
+## Replicates authentic 1989 NES Tetris logic from typeBRows / typeBGarbageInRow.
+func setup_type_b_garbage(height: int, seed_val: int = -1) -> void:
+	clear()
+	var h: int = clampi(height, 0, 5)
+	if h <= 0:
+		return
+
+	var num_rows: int = Constants.TYPE_B_GARBAGE_ROWS[h]
+	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+	if seed_val >= 0:
+		rng.seed = seed_val
+	else:
+		rng.randomize()
+
+	# Authentic row filling from bottom (row 21) up to row (22 - num_rows)
+	for r_offset in range(num_rows):
+		var r: int = Constants.GRID_ROWS - 1 - r_offset
+		# Guarantee at least one blank column (typeBGuaranteeBlank)
+		var blank_col: int = rng.randi_range(0, Constants.GRID_COLUMNS - 1)
+		for c in range(Constants.GRID_COLUMNS):
+			if c == blank_col:
+				set_cell(c, r, Constants.TileType.EMPTY)
+			else:
+				var roll: int = rng.randi() & 0x07
+				set_cell(c, r, Constants.TYPE_B_RNG_TABLE[roll])

@@ -101,4 +101,17 @@ updated: 2026-11-20
     - Implemented automatic ROM ingestion in `main.gd` scanning `user://nes_data/` and root `tetris.nes`.
     - Added `ROM_SETUP` state to `GameStateMachine` and dedicated setup prompt in `PlayfieldRenderer` directing player to provide `tetris.nes` when data is missing.
   - **Headless Verification**: Executed `godot --headless --path . --quit` and `godot --headless -s tests/test_runner.gd` with 10/10 test suites passing cleanly with zero errors.
-  - **Next Target Milestone**: Phase 2: Menu Flow & Game Modes.
+- **Phase 2 Completion (Menu Flow & Game Modes)**:
+  - **Menu Controller**: Implemented `src/game/menu_controller.gd` orchestrating authentic 60 TPS menu state machine (`TITLE_SCREEN`, `GAME_TYPE_MENU`, `LEVEL_MENU`, `IN_GAME`).
+  - **Authentic PPU Nametable Extraction**: Added `decode_ppu_nametable_stream()` and `render_nametable_image()` in `src/importer/chr_extractor.gd` extracting Title Screen (`0x003229`), Game Type menu (`0x00368A`), Level menu Type B (`0x003AEB`), and Type A height patch (`0x00496D`), rendering 256x240 authentic textures via CHR Bank 0 and menu palette (`$9731` / `0x002D3B`).
+  - **Game Modes & Navigation**:
+    - Title Screen: Blinking "PUSH START BUTTON", Start button transitions to Game Type Menu.
+    - Game Type Menu: Left/Right selects A-TYPE / B-TYPE; Up/Down selects MUSIC-1, MUSIC-2, MUSIC-3, OFF with audio preview and cursor flicker.
+    - Level Menu: 2x5 grid navigation for Levels 0..9 (Left/Right step 1, Up/Down jump 5).
+    - Authentic A+Start Secret: Holding Button A while pressing Start launches starting levels 10..19.
+    - Type B Height Selection: Button A toggles between Level and Height selection; 2x3 grid navigation for Heights 0..5 (Left/Right step 1, Up/Down jump 3).
+  - **Type B Simulation Mechanics**:
+    - Implemented `BoardGrid.setup_type_b_garbage()` generating 0, 3, 5, 8, 10, 12 rows for heights 0..5 using authentic `rngTable` and `typeBGuaranteeBlank` (guaranteed blank holes per row).
+    - Implemented 25-line goal countdown and victory bonus `(Level + 1) * 1000 + Height * 1000` in `ScoreManager`.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **11/11 test suites passing cleanly** (including `tests/test_menu.gd`).
+  - **Next Target Milestone**: Phase 3: High Score System & Polish.

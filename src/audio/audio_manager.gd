@@ -94,6 +94,8 @@ enum SFX {
 	TETRIS = 4,
 	LEVEL_UP = 5,
 	GAME_OVER = 6,
+	CURSOR = 7,
+	MENU_START = 8,
 }
 
 class ActiveSFX:
@@ -207,6 +209,12 @@ func play_sfx(sfx_id: int) -> void:
 		SFX.GAME_OVER:
 			s.channel = "sq1"
 			s.max_frames = 48
+		SFX.CURSOR:
+			s.channel = "sq1"
+			s.max_frames = 3
+		SFX.MENU_START:
+			s.channel = "sq1"
+			s.max_frames = 8
 		_:
 			s.channel = "sq1"
 			s.max_frames = 10
@@ -274,6 +282,12 @@ func _update_sfx() -> void:
 					noise.enabled = true
 					noise.period = 0.001 + float(sfx.frame) * 0.0002
 					noise.volume = 0.5 * (1.0 - progress)
+				SFX.CURSOR:
+					sq1.timer_period = 0x07F # 880 Hz quick blip
+					sq1.volume = 0.5 * (1.0 - progress)
+				SFX.MENU_START:
+					sq1.timer_period = 0x0FE if sfx.frame < 4 else 0x07F
+					sq1.volume = 0.6 * (1.0 - progress)
 
 		if sfx.frame >= sfx.max_frames:
 			if sfx.channel == "sq1":
@@ -307,6 +321,21 @@ func clear_sfx() -> void:
 	sq2.enabled = false
 	tri.enabled = false
 	noise.enabled = false
+
+var current_music_track: int = 0
+
+## Sets the current BGM track (0=Music 1/Korobeiniki, 1=Music 2, 2=Music 3, 3=Off).
+func set_music_track(track_type: int) -> void:
+	current_music_track = track_type
+	if track_type == 3: # OFF
+		tri.enabled = false
+		tri.volume = 0.0
+	else:
+		tri.enabled = true
+		tri.volume = 0.4
+		var note_idx: int = 24 + track_type * 4
+		var period: int = get_timer_period_for_note(note_idx)
+		tri.timer_period = period if period > 0 else 0x080
 
 # --- EventBus Handlers ---
 

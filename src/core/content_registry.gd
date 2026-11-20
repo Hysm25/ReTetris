@@ -74,6 +74,13 @@ var extracted_points_table: Array[int] = []
 var extracted_color_table: Array[Array] = []
 var extracted_spawn_orientations: Array[int] = []
 
+# Extracted Authentic Menu Textures (256x240)
+var title_screen_texture: ImageTexture = null
+var game_type_menu_texture: ImageTexture = null
+var level_menu_a_texture: ImageTexture = null
+var level_menu_b_texture: ImageTexture = null
+var menu_palette_colors: Array[Color] = []
+
 # Initialization State (Enforces Mandatory ROM Ingestion)
 var is_initialized: bool = false
 
@@ -209,6 +216,21 @@ func ingest_rom_data(extracted_data: Dictionary) -> bool:
 		var textures: Array[ImageTexture] = [_empty_tile_texture, t1, t2, t3]
 		set_custom_level_textures(lvl, textures)
 
+	# 3. Ingest Authentic Menu Textures
+	if extracted_data.has("title_screen_texture"):
+		title_screen_texture = extracted_data["title_screen_texture"] as ImageTexture
+	if extracted_data.has("game_type_menu_texture"):
+		game_type_menu_texture = extracted_data["game_type_menu_texture"] as ImageTexture
+	if extracted_data.has("level_menu_a_texture"):
+		level_menu_a_texture = extracted_data["level_menu_a_texture"] as ImageTexture
+	if extracted_data.has("level_menu_b_texture"):
+		level_menu_b_texture = extracted_data["level_menu_b_texture"] as ImageTexture
+	if extracted_data.has("menu_palette"):
+		var raw_pal: PackedByteArray = extracted_data["menu_palette"]
+		menu_palette_colors.clear()
+		for b in raw_pal:
+			menu_palette_colors.append(Constants.NES_MASTER_PALETTE[b])
+
 	is_initialized = true
 	return true
 
@@ -258,8 +280,27 @@ func set_custom_level_textures(level_idx: int, textures: Array[ImageTexture]) ->
 	_tile_texture_cache[idx] = textures
 	_atlas_texture_cache.erase(idx)
 
+## Menu Background Texture Getters
+func get_title_screen_texture() -> ImageTexture:
+	return title_screen_texture if is_initialized else _empty_tile_texture
+
+func get_game_type_menu_texture() -> ImageTexture:
+	return game_type_menu_texture if is_initialized else _empty_tile_texture
+
+func get_level_menu_texture(game_type: int) -> ImageTexture:
+	if not is_initialized:
+		return _empty_tile_texture
+	if game_type == Constants.GameType.TYPE_B:
+		return level_menu_b_texture
+	return level_menu_a_texture
+
 ## Clears custom textures.
 func reset_custom_textures() -> void:
 	_tile_texture_cache.clear()
 	_atlas_texture_cache.clear()
+	title_screen_texture = null
+	game_type_menu_texture = null
+	level_menu_a_texture = null
+	level_menu_b_texture = null
+	menu_palette_colors.clear()
 	is_initialized = false

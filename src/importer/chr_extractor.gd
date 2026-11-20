@@ -31,6 +31,11 @@ const SPAWN_ORIENTATIONS_OFFSET: int = 0x00195E # CPU $994E (7 bytes: piece spaw
 const NOTE_TO_WAVE_ROM_OFFSET: int = 0x004655    # CPU $C645 (134 bytes: pitch period table)
 const NOTE_DURATION_ROM_OFFSET: int = 0x0046FB   # CPU $C6EB (77 bytes: note duration table)
 const MUSIC_DATA_TABLE_ROM_OFFSET: int = 0x004747# CPU $C737 (100 bytes: music track table)
+const MENU_PALETTE_ROM_OFFSET: int = 0x002D3B       # CPU $9731 (20 bytes + header)
+const TITLE_NAMETABLE_ROM_OFFSET: int = 0x003229     # CPU $B219 (title screen compressed stream)
+const GAME_TYPE_NAMETABLE_ROM_OFFSET: int = 0x00368A  # CPU $B67A (game type menu compressed stream)
+const LEVEL_MENU_NAMETABLE_ROM_OFFSET: int = 0x003AEB # CPU $BADA (level menu compressed stream)
+const HEIGHT_PATCH_ROM_OFFSET: int = 0x00496D        # CPU $C95D (Type A height blanking patch)
 
 # --- CHR Bank Offsets & Game Tile Indices ---
 const CHR_BANK_0_TITLE: int = 0
@@ -183,6 +188,88 @@ static func chr_bank_to_image(chr_bytes: PackedByteArray, bank_offset: int = 0, 
 
 	return img
 
+## Decodes authentic run-length compressed NES PPU nametable streams.
+static func decode_ppu_nametable_stream(stream: PackedByteArray, initial_ppu: PackedByteArray = PackedByteArray()) -> PackedByteArray:
+	var ppu: PackedByteArray = PackedByteArray()
+	if initial_ppu.size() >= 0x4000:
+		ppu = initial_ppu.duplicate()
+	else:
+		ppu.resize(0x4000)
+		for i in range(0x4000):
+			ppu[i] = 0xFF
+
+	var pos: int = 0
+	while pos < stream.size():
+		var b0: int = stream[pos]
+		if (b0 & 0x80) != 0:
+			break
+		var hi: int = stream[pos]
+		var lo: int = stream[pos + 1]
+		var addr: int = (hi << 8) | lo
+		var header: int = stream[pos + 2]
+		pos += 3
+		var inc: int = 32 if (header & 0x80) != 0 else 1
+		var is_rle: bool = (header & 0x40) != 0
+		var length: int = header & 0x3F
+		if is_rle:
+			var val: int = stream[pos]
+			pos += 1
+			for _i in range(length):
+				if addr < 0x4000:
+					ppu[addr] = val
+				addr += inc
+		else:
+			for _i in range(length):
+				var val: int = stream[pos]
+				pos += 1
+				if addr < 0x4000:
+					ppu[addr] = val
+				addr += inc
+	return ppu
+
+## Renders a 1024-byte authentic NES nametable (960 tile IDs + 64 attributes)
+## into a 256x240 Image using 2bpp tiles from CHR Bank 0 and authentic menu palette.
+static func render_nametable_image(nametable: PackedByteArray, chr_bank_0: PackedByteArray, palette_bytes: PackedByteArray) -> Image:
+	var img: Image = Image.create(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT, false, Image.FORMAT_RGBA8)
+	img.fill(Color.BLACK)
+
+	var bg_palettes: Array[Array] = []
+	for p in range(4):
+		var pal: Array[Color] = []
+		for c in range(4):
+			var idx: int = palette_bytes[p * 4 + c] if (p * 4 + c) < palette_bytes.size() else 0x0F
+			pal.append(Constants.NES_MASTER_PALETTE[idx])
+		bg_palettes.append(pal)
+
+	var tiles_pixels: Array[PackedByteArray] = []
+	for t in range(256):
+		var tile_data: PackedByteArray = chr_bank_0.slice(t * 16, (t + 1) * 16)
+		tiles_pixels.append(decode_tile_2bpp(tile_data))
+
+	for r in range(30):
+		for c in range(32):
+			var tile_id: int = nametable[r * 32 + c]
+			if tile_id == 0xFF:
+				continue
+
+			var attr_idx: int = 960 + int(r / 4) * 8 + int(c / 4)
+			var attr_byte: int = nametable[attr_idx] if attr_idx < nametable.size() else 0
+			var quad_x: int = int(c % 4) / 2
+			var quad_y: int = int(r % 4) / 2
+			var shift: int = (quad_y * 2 + quad_x) * 2
+			var pal_idx: int = (attr_byte >> shift) & 0x03
+			var pal: Array[Color] = bg_palettes[pal_idx]
+			var pixels: PackedByteArray = tiles_pixels[tile_id]
+
+			var origin_x: int = c * 8
+			var origin_y: int = r * 8
+			for py in range(8):
+				for px in range(8):
+					var col_val: int = pixels[py * 8 + px]
+					img.set_pixel(origin_x + px, origin_y + py, pal[col_val])
+
+	return img
+
 # --- Comprehensive 100% Extraction Pipeline ---
 
 ## Extracts 100% of authentic game data (CHR pattern tables, PRG lookup tables, PRG audio tables) from ROM bytes.
@@ -285,6 +372,38 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 		})
 
 	result["level_textures"] = level_textures
+
+	# 9. Extract PRG-ROM Menu Palettes & Nametables
+	var menu_palette: PackedByteArray = rom_bytes.slice(MENU_PALETTE_ROM_OFFSET + 3, MENU_PALETTE_ROM_OFFSET + 23)
+	result["menu_palette"] = menu_palette
+
+	var ppu_title: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TITLE_NAMETABLE_ROM_OFFSET))
+	var nt_title: PackedByteArray = ppu_title.slice(0x2000, 0x2400)
+	result["title_nametable"] = nt_title
+
+	var ppu_type: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(GAME_TYPE_NAMETABLE_ROM_OFFSET))
+	var nt_type: PackedByteArray = ppu_type.slice(0x2000, 0x2400)
+	result["game_type_nametable"] = nt_type
+
+	var ppu_lvl_b: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(LEVEL_MENU_NAMETABLE_ROM_OFFSET))
+	var nt_lvl_b: PackedByteArray = ppu_lvl_b.slice(0x2000, 0x2400)
+	result["level_menu_nametable_b"] = nt_lvl_b
+
+	var ppu_lvl_a: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(HEIGHT_PATCH_ROM_OFFSET), ppu_lvl_b)
+	var nt_lvl_a: PackedByteArray = ppu_lvl_a.slice(0x2000, 0x2400)
+	result["level_menu_nametable_a"] = nt_lvl_a
+
+	# 10. Generate 256x240 Authentic Menu Textures (from Bank 0 and Nametables)
+	var title_img: Image = render_nametable_image(nt_title, chr_bank_0, menu_palette)
+	var type_img: Image = render_nametable_image(nt_type, chr_bank_0, menu_palette)
+	var lvl_a_img: Image = render_nametable_image(nt_lvl_a, chr_bank_0, menu_palette)
+	var lvl_b_img: Image = render_nametable_image(nt_lvl_b, chr_bank_0, menu_palette)
+
+	result["title_screen_texture"] = ImageTexture.create_from_image(title_img)
+	result["game_type_menu_texture"] = ImageTexture.create_from_image(type_img)
+	result["level_menu_a_texture"] = ImageTexture.create_from_image(lvl_a_img)
+	result["level_menu_b_texture"] = ImageTexture.create_from_image(lvl_b_img)
+
 	result["success"] = true
 	return result
 

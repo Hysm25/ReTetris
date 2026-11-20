@@ -1,14 +1,61 @@
 # Project Status (`docs/STATUS.md`)
 
 ## Current Phase
-- **Phase 2: Menu Flow & Game Modes (Next Target)**
-  - **Context**: Build the authentic 1989 NES Tetris frontend menu flow using authentic extracted CHR Bank 0/1 assets and PRG menu tables.
-  - **Rule**: Zero procedural fallbacks. Mandatory ROM ingestion architecture is fully active; gameplay and menus run strictly on authentic ROM assets extracted into `user://nes_data/`.
+- **Phase 3: High Score System & Polish (Next Target)**
+  - **Context**: Implement the persistent high score system (table, entry screen, signature inputs) and authentic game polish (curtain wipe topout animation, rocket ending sequence).
+  - **Rule**: Zero procedural fallbacks. All graphics and palettes sourced directly from extracted ROM assets in `user://nes_data/`.
   - **Completed Foundation**:
     1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
     2. Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, `piece_controller.gd`, `score_manager.gd`, `game_state_machine.gd`)
     3. Baseline Rendering, Audio & Importer (`playfield_renderer.gd`, `audio_manager.gd`, `chr_extractor.gd`, `main.gd`, `main.tscn`)
     4. Mandatory ROM Ingestion Refactor (`chr_extractor.gd`, `content_registry.gd`, `audio_manager.gd`, `main.gd`, `playfield_renderer.gd`)
+    5. Phase 2: Menu Flow & Game Modes (`menu_controller.gd`, nametable extraction, Type B mode, level 10-19 shortcut)
+
+---
+
+## Phase 2: Menu Flow & Game Modes (Completed)
+
+### 1. Authentic Menu Flow & State Machine (`src/game/menu_controller.gd`)
+- [x] Title Screen with authentic animated logo and copyright notice:
+  - Compressed PPU nametable extracted from PRG-ROM offset `0x003229` (CPU `$B219`).
+  - Rendered at 256x240 with CHR Bank 0 graphics and authentic menu palette.
+  - Flashing "PUSH START BUTTON" text, advancing to Game Type Menu on `BUTTON_START`.
+- [x] Game Type A / Type B Selection Screen:
+  - Compressed PPU nametable extracted from PRG-ROM offset `0x00368A` (CPU `$B67A`).
+  - Left/Right controller navigation between `A-TYPE` and `B-TYPE` with flashing selection box.
+  - `BUTTON_B` returns to Title Screen; `BUTTON_START` advances to Level Menu.
+- [x] Music Track Selection Screen:
+  - Integrated into Game Type menu with options `MUSIC-1` (Korobeiniki), `MUSIC-2`, `MUSIC-3`, and `OFF`.
+  - Up/Down navigation with live audio preview and flashing cursor arrow.
+- [x] Starting Level (0–19) and Type B Height (0–5) selection menus:
+  - Compressed PPU nametable extracted from PRG-ROM offset `0x003AEB` (CPU `$BADA`).
+  - Dynamic Type A height blanking patch extracted from ROM offset `0x00496D` (CPU `$C95D`).
+  - 2x5 grid navigation for Levels 0..9 (Left/Right step 1, Up/Down jump 5).
+  - Authentic `A + START` secret: holding Button A while pressing Start adds 10 to selected level (Levels 10..19).
+  - Type B Height selection: Button A toggles between Level and Height selection; 2x3 grid navigation for Heights 0..5 (Left/Right step 1, Up/Down jump 3).
+
+### 2. Type B Mode Gameplay Simulation (`src/game/`)
+- [x] Implemented `BoardGrid.setup_type_b_garbage()`:
+  - Generates authentic starting garbage for heights 0..5 (`[0, 3, 5, 8, 10, 12]` rows).
+  - Populates cells using authentic NES `rngTable` (`[0, 1, 0, 2, 3, 3, 0, 0]`).
+  - Implemented `typeBGuaranteeBlank` ensuring at least one empty cell per row so lines never spawn pre-cleared.
+- [x] Implemented Type B scoring & 25-line goal in `ScoreManager`:
+  - `lines` and `lines_remaining` count down from 25 to 0.
+  - Display HUD shows lines remaining in Type B mode.
+  - Clearing 25 lines triggers goal achieved flag and awards authentic Type B completion bonus: `(Level + 1) * 1000 + Height * 1000`.
+
+### 3. Automated Headless Verification
+- [x] Created `tests/test_menu.gd` covering 9 comprehensive test suites:
+  - MenuController initialization & default state.
+  - Title screen Start button transition & sound.
+  - Game Type menu navigation (A/B, Music 1..3 & Off, B button return).
+  - Level menu navigation for Type A.
+  - Authentic `A + START` level 10..19 cheat.
+  - Type B height selection & Button A toggle.
+  - Type B garbage row counts (0, 3, 5, 8, 10, 12) & guaranteed blank holes.
+  - Type B 25-line countdown, goal achieved trigger, and completion bonus formula.
+  - 1024-byte nametable decoding and 256x240 menu texture rendering.
+- [x] Verified full headless test suite: **11/11 test suites passing cleanly** via `godot --headless -s tests/test_runner.gd`.
 
 ---
 
@@ -49,11 +96,6 @@
   - If no ROM is found, immediately halts game initialization and enters `ROM_SETUP` state.
 - [x] Updated `src/game/playfield_renderer.gd` to render the authentic Missing ROM setup prompt when in `ROM_SETUP` state.
 
-### 4. Automated Verification Test Suite
-- [x] Updated `tests/test_importer.gd` with 8 comprehensive test cases verifying SHA-256 / CRC32 checks, 2bpp decoding, authentic Tile 0x7B pixels, 100% data extraction, and ContentRegistry / AudioManager injection.
-- [x] Updated `tests/test_core.gd` and `tests/test_renderer.gd` verifying mandatory ROM ingestion and zero procedural fallbacks.
-- [x] Verified full headless execution via `godot --headless --path . --quit` and `godot --headless -s tests/test_runner.gd` with 10/10 test suites passing cleanly.
-
 ---
 
 ## Completed Milestones (Phase 1 Baseline)
@@ -80,18 +122,13 @@
 - [x] Implemented `src/audio/audio_manager.gd`: Clean-room 2A03 APU audio synthesizer (Pulse, Triangle, Noise channels) using `AudioStreamGenerator`, authentic SFX envelopes (`SHIFT`, `ROTATE`, `LOCK`, `LINE_CLEAR`, `TETRIS`, `LEVEL_UP`, `GAME_OVER`), and headless synthesis buffers.
 - [x] Implemented `src/importer/chr_extractor.gd`: Pure GDScript iNES header parsing (`NES\x1A`), 2bpp planar tile decoding, 128x128 bank sheet and 8x8 tile image generation, PRG-ROM palette extraction (CPU $984C / ROM offset 0x00185C), and `apply_to_content_registry` texture injection.
 - [x] Implemented `src/main.gd` & updated `src/main.tscn`: Root scene coordinator wiring state machine, renderer, and audio manager to the 60 TPS simulation loop.
-- [x] Automated Headless Verification: 10 test suites (`test_core.gd`, `test_randomizer.gd`, `test_board_grid.gd`, `test_das.gd`, `test_piece_controller.gd`, `test_score_manager.gd`, `test_game_simulation.gd`, `test_renderer.gd`, `test_audio.gd`, `test_importer.gd`) passing 100% of assertions.
+- [x] Automated Headless Verification: 10 test suites passing 100% of assertions.
 
 ---
 
-## Future Phases (Post Refactor)
-
-### Phase 2: Menu Flow & Game Modes
-- [ ] Title Screen with authentic animated logo and copyright notice from CHR Bank 0.
-- [ ] Game Type A / Type B Selection Screen.
-- [ ] Music Track Selection Screen (Music 1, Music 2, Music 3, Off).
-- [ ] Starting Level (0–19) and Type B Height (0–5) selection menus.
+## Future Phases
 
 ### Phase 3: High Score System & Polish
 - [ ] High Score Table with persistent storage in `user://high_scores.dat`.
+- [ ] High Score Entry Screen with 3-character initials input.
 - [ ] Topout animation curtain wipe and ending rocket sequence animations (from CHR Bank 2).

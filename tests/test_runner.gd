@@ -14,6 +14,7 @@ const TestGameSimulation = preload("res://tests/test_game_simulation.gd")
 const TestRenderer = preload("res://tests/test_renderer.gd")
 const TestAudio = preload("res://tests/test_audio.gd")
 const TestImporter = preload("res://tests/test_importer.gd")
+const TestMenu = preload("res://tests/test_menu.gd")
 
 func _init() -> void:
 	print("==================================================")
@@ -40,9 +41,13 @@ func _init() -> void:
 	success = TestAudio.run_tests() and success
 	success = TestImporter.run_tests() and success
 
+	# 4. Phase 2: Menu Flow & Game Modes
+	print("\n>>> Running Phase 2: Menu Flow & Game Modes Tests <<<")
+	success = TestMenu.run_tests() and success
+
 	print("\n==================================================")
 	if success:
-		print(">>> ALL TEST SUITES PASSED CLEANLY! (10/10 Suites) <<<")
+		print(">>> ALL TEST SUITES PASSED CLEANLY! (11/11 Suites) <<<")
 		print("==================================================")
 		quit(0)
 	else:

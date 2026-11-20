@@ -17,6 +17,7 @@ const GameStateMachine = preload("res://src/game/game_state_machine.gd")
 
 # Optional direct reference to GameStateMachine (for single-node setup)
 var game_state: GameStateMachine = null
+var menu_ctrl: RefCounted = null
 
 # Cached HUD and Game State
 var current_level: int = 0
@@ -39,8 +40,9 @@ const COLOR_TEXT_RED: Color = Color("#FE8176")
 # Font cache (built-in fallback system font)
 var _hud_font: Font = null
 
-func _init(p_game_state: GameStateMachine = null) -> void:
+func _init(p_game_state: GameStateMachine = null, p_menu_ctrl: RefCounted = null) -> void:
 	game_state = p_game_state
+	menu_ctrl = p_menu_ctrl
 
 func _ready() -> void:
 	_hud_font = ThemeDB.fallback_font
@@ -93,6 +95,17 @@ func _draw() -> void:
 		_draw_rom_setup_screen()
 		return
 
+	if menu_ctrl != null and menu_ctrl.get("current_mode") != Constants.MenuMode.IN_GAME:
+		var mode: int = menu_ctrl.get("current_mode")
+		match mode:
+			Constants.MenuMode.TITLE_SCREEN:
+				_draw_title_screen()
+			Constants.MenuMode.GAME_TYPE_MENU:
+				_draw_game_type_menu()
+			Constants.MenuMode.LEVEL_MENU:
+				_draw_level_menu()
+		return
+
 	_draw_background()
 	_draw_playfield_frame()
 	_draw_playfield_matrix()
@@ -101,6 +114,81 @@ func _draw() -> void:
 	_draw_hud()
 	if is_game_over:
 		_draw_game_over_banner()
+
+func _draw_title_screen() -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg != null and reg.has_method("get_title_screen_texture"):
+		var tex: ImageTexture = reg.get_title_screen_texture()
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+		else:
+			_draw_text("TETRIS", Vector2(104, 70), COLOR_WHITE)
+	else:
+		_draw_text("TETRIS", Vector2(104, 70), COLOR_WHITE)
+
+	if menu_ctrl != null and (int(menu_ctrl.get("cursor_timer")) & 0x10) != 0:
+		_draw_text("PUSH START BUTTON", Vector2(56, 170), COLOR_WHITE)
+
+func _draw_game_type_menu() -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg != null and reg.has_method("get_game_type_menu_texture"):
+		var tex: ImageTexture = reg.get_game_type_menu_texture()
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+
+	if menu_ctrl == null:
+		return
+
+	var timer: int = int(menu_ctrl.get("cursor_timer"))
+	if (timer & 0x08) != 0:
+		var g_type: int = int(menu_ctrl.get("game_type"))
+		var cursor_x: float = 48.0 if g_type == Constants.GameType.TYPE_A else 144.0
+		draw_rect(Rect2(cursor_x, 56, 64, 24), COLOR_BORDER_ACCENT, false, 2.0)
+
+	if (timer & 0x08) != 0:
+		var m_type: int = int(menu_ctrl.get("music_type"))
+		var music_y: float = 135.0 + float(m_type) * 16.0
+		draw_rect(Rect2(88, music_y, 80, 14), COLOR_WHITE, false, 1.0)
+
+func _draw_level_menu() -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	var g_type: int = int(menu_ctrl.get("game_type")) if menu_ctrl != null else 0
+	if reg != null and reg.has_method("get_level_menu_texture"):
+		var tex: ImageTexture = reg.get_level_menu_texture(g_type)
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+
+	if menu_ctrl == null:
+		return
+
+	var timer: int = int(menu_ctrl.get("cursor_timer"))
+	var sel_lvl: int = int(menu_ctrl.get("selected_level")) % 10
+	var col: int = sel_lvl % 5
+	var row: int = sel_lvl / 5
+	var lx: float = 48.0 + float(col) * 16.0
+	var ly: float = 78.0 + float(row) * 16.0
+
+	var is_sel_height: bool = bool(menu_ctrl.get("selecting_height"))
+	var show_lvl: bool = true
+	if not is_sel_height:
+		show_lvl = ((timer & 0x08) != 0)
+
+	if show_lvl:
+		draw_rect(Rect2(lx, ly, 14, 14), COLOR_BORDER_ACCENT, false, 2.0)
+
+	if g_type == Constants.GameType.TYPE_B:
+		var sel_h: int = int(menu_ctrl.get("selected_height"))
+		var h_col: int = sel_h % 3
+		var h_row: int = sel_h / 3
+		var hx: float = 152.0 + float(h_col) * 16.0
+		var hy: float = 78.0 + float(h_row) * 16.0
+
+		var show_h: bool = true
+		if is_sel_height:
+			show_h = ((timer & 0x08) != 0)
+
+		if show_h:
+			draw_rect(Rect2(hx, hy, 14, 14), COLOR_BORDER_ACCENT, false, 2.0)
 
 func _draw_rom_setup_screen() -> void:
 	draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
@@ -228,7 +316,10 @@ func _draw_preview_box() -> void:
 func _draw_hud() -> void:
 	# 1. Lines counter (Top Center: X: 152, Y: 16)
 	_draw_text("LINES", Vector2(152, 16), COLOR_WHITE)
-	_draw_text("%03d" % current_lines, Vector2(160, 26), COLOR_WHITE)
+	if game_state != null and game_state.current_game_type == Constants.GameType.TYPE_B:
+		_draw_text("%02d" % game_state.score_mgr.lines_remaining, Vector2(160, 26), COLOR_WHITE)
+	else:
+		_draw_text("%03d" % current_lines, Vector2(160, 26), COLOR_WHITE)
 
 	# 2. Top Score (Upper Right: X: 192, Y: 32)
 	_draw_text("TOP", Vector2(192, 32), COLOR_WHITE)

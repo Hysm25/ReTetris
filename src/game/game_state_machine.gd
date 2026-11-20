@@ -22,6 +22,7 @@ enum State {
 }
 
 var current_state: State = State.SPAWNING
+var current_game_type: int = Constants.GameType.TYPE_A
 var grid: BoardGrid
 var das: DASHandler
 var piece: PieceController
@@ -48,12 +49,16 @@ func _ready() -> void:
 	if not is_headless_testing:
 		start_game(0)
 
-func start_game(starting_level: int, seed_val: int = -1) -> void:
+func start_game(starting_level: int, game_type: int = Constants.GameType.TYPE_A, starting_height: int = 0, seed_val: int = -1) -> void:
 	grid.clear()
 	das.reset()
 	piece.reset()
 	randomizer.reset(seed_val)
-	score_mgr.init_game(starting_level)
+	current_game_type = game_type
+	score_mgr.init_game(starting_level, game_type, starting_height)
+
+	if game_type == Constants.GameType.TYPE_B:
+		grid.setup_type_b_garbage(starting_height, seed_val)
 
 	# Initial roll for active and next piece
 	var first_piece: int = randomizer.roll_next_piece()
@@ -164,6 +169,11 @@ func _process_line_clear_anim(held_buttons: int) -> void:
 			_emit_level_updated(score_mgr.level)
 
 		completed_rows.clear()
+		if current_game_type == Constants.GameType.TYPE_B and score_mgr.is_goal_reached:
+			current_state = State.GAME_OVER
+			_emit_game_over()
+			return
+
 		are_timer = Constants.ARE_POST_CLEAR_FRAMES
 		current_state = State.ARE_DELAY
 
