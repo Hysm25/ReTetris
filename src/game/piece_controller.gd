@@ -6,6 +6,7 @@ extends RefCounted
 
 const Constants = preload("res://src/core/constants.gd")
 const BoardGrid = preload("res://src/game/board_grid.gd")
+const ContentRegistry = preload("res://src/core/content_registry.gd")
 
 var piece_type: int = Constants.PieceType.T
 var orientation: int = Constants.Orientation.T_DOWN
@@ -117,3 +118,15 @@ func tick_gravity(level: int, down_held: bool, grid: BoardGrid) -> Dictionary:
 			result["locked"] = true
 
 	return result
+
+## Returns the array of 4 absolute playfield grid coordinates for the active piece's minos.
+func get_mino_positions() -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+	if orientation < 0 or orientation >= ContentRegistry.ORIENTATION_MINO_OFFSETS.size():
+		return result
+	var offsets: Array = ContentRegistry.ORIENTATION_MINO_OFFSETS[orientation]
+	for offset in offsets:
+		var vec: Vector2i = offset as Vector2i
+		result.append(position + vec)
+	return result
+

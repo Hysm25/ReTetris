@@ -11,6 +11,9 @@ const TestDAS = preload("res://tests/test_das.gd")
 const TestPieceController = preload("res://tests/test_piece_controller.gd")
 const TestScoreManager = preload("res://tests/test_score_manager.gd")
 const TestGameSimulation = preload("res://tests/test_game_simulation.gd")
+const TestRenderer = preload("res://tests/test_renderer.gd")
+const TestAudio = preload("res://tests/test_audio.gd")
+const TestImporter = preload("res://tests/test_importer.gd")
 
 func _init() -> void:
 	print("==================================================")
@@ -31,9 +34,15 @@ func _init() -> void:
 	success = TestScoreManager.run_tests() and success
 	success = TestGameSimulation.run_tests() and success
 
+	# 3. Milestone 3: Rendering, Audio & Importer
+	print("\n>>> Running Milestone 3: Rendering, Audio & Importer Tests <<<")
+	success = TestRenderer.run_tests() and success
+	success = TestAudio.run_tests() and success
+	success = TestImporter.run_tests() and success
+
 	print("\n==================================================")
 	if success:
-		print(">>> ALL TEST SUITES PASSED CLEANLY! (7/7 Suites) <<<")
+		print(">>> ALL TEST SUITES PASSED CLEANLY! (10/10 Suites) <<<")
 		print("==================================================")
 		quit(0)
 	else:

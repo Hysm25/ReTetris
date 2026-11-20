@@ -255,3 +255,16 @@ func _generate_level_atlas(level_idx: int) -> void:
 
 	var atlas_tex: ImageTexture = ImageTexture.create_from_image(atlas_img)
 	_atlas_texture_cache[level_idx] = atlas_tex
+
+## Allows injecting custom/extracted textures (e.g. from CHRExtractor) for a given level.
+## Array must contain 4 ImageTextures: [EMPTY, PRIMARY, SECONDARY, TERTIARY].
+func set_custom_level_textures(level_idx: int, textures: Array[ImageTexture]) -> void:
+	var idx: int = absi(level_idx) % 10
+	_tile_texture_cache[idx] = textures
+	_atlas_texture_cache.erase(idx)
+
+## Clears custom textures and restores default procedural generation.
+func reset_custom_textures() -> void:
+	_tile_texture_cache.clear()
+	_atlas_texture_cache.clear()
+
