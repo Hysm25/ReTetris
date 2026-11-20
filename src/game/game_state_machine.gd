@@ -19,6 +19,8 @@ enum State {
 	ARE_DELAY = 3,
 	GAME_OVER = 4,
 	ROM_SETUP = 5,
+	CURTAIN_WIPE = 6,
+	ENDING_ANIMATION = 7,
 }
 
 var current_state: State = State.SPAWNING
@@ -37,6 +39,17 @@ var completed_rows: Array[int] = []
 
 # Optional manual stepping flag (for automated unit testing)
 var is_headless_testing: bool = false
+
+# Topout Curtain Wipe and Rocket Ending State
+var enable_curtain_wipe: bool = true
+var curtain_row: int = -Constants.CURTAIN_INITIAL_DELAY
+var curtain_frame_counter: int = 0
+
+var ending_tier: int = Constants.RocketTier.TIER_0_SMALL
+var ending_frame_counter: int = 0
+var ending_rocket_y: float = 191.0
+var ending_rocket_x: float = 84.0
+var ending_completed: bool = false
 
 func _init() -> void:
 	grid = BoardGrid.new()
@@ -70,8 +83,11 @@ func start_game(starting_level: int, game_type: int = Constants.GameType.TYPE_A,
 func _spawn_piece(type: int) -> void:
 	var success: bool = piece.spawn(type, grid)
 	if not success:
-		current_state = State.GAME_OVER
-		_emit_game_over()
+		if enable_curtain_wipe and not is_headless_testing:
+			start_curtain_wipe()
+		else:
+			current_state = State.GAME_OVER
+			_emit_game_over()
 		return
 
 	current_state = State.ACTIVE_PLAY
@@ -91,6 +107,10 @@ func step_frame(held_buttons: int, newly_pressed_buttons: int) -> void:
 			var p_type: int = next_piece_type
 			next_piece_type = randomizer.roll_next_piece()
 			_spawn_piece(p_type)
+		State.CURTAIN_WIPE:
+			_process_curtain_wipe()
+		State.ENDING_ANIMATION:
+			_process_ending_animation(held_buttons, newly_pressed_buttons)
 		State.GAME_OVER:
 			pass
 		State.ROM_SETUP:
@@ -170,8 +190,11 @@ func _process_line_clear_anim(held_buttons: int) -> void:
 
 		completed_rows.clear()
 		if current_game_type == Constants.GameType.TYPE_B and score_mgr.is_goal_reached:
-			current_state = State.GAME_OVER
-			_emit_game_over()
+			if enable_curtain_wipe and not is_headless_testing:
+				start_curtain_wipe()
+			else:
+				current_state = State.GAME_OVER
+				_emit_game_over()
 			return
 
 		are_timer = Constants.ARE_POST_CLEAR_FRAMES
@@ -281,3 +304,82 @@ func _emit_game_over() -> void:
 	var bus = _get_event_bus()
 	if bus:
 		bus.game_over.emit()
+
+func _emit_sfx_requested(sfx_id: int) -> void:
+	var bus = _get_event_bus()
+	if bus and bus.has_user_signal("sfx_requested"):
+		bus.emit_signal("sfx_requested", sfx_id)
+
+## Initiates the authentic NES 20-row curtain wipe animation.
+func start_curtain_wipe() -> void:
+	current_state = State.CURTAIN_WIPE
+	curtain_row = -Constants.CURTAIN_INITIAL_DELAY
+	curtain_frame_counter = 0
+	_emit_sfx_requested(Constants.SFX_CURTAIN)
+
+func _process_curtain_wipe() -> void:
+	curtain_frame_counter += 1
+	if curtain_frame_counter % Constants.CURTAIN_FRAME_STEP == 0:
+		if curtain_row < 0:
+			curtain_row += 1
+		elif curtain_row < Constants.CURTAIN_ROWS:
+			# Fill row across all columns with curtain tile
+			grid.fill_row(curtain_row + Constants.HIDDEN_ROWS, 1)
+			_emit_sfx_requested(Constants.SFX_CURTAIN)
+			curtain_row += 1
+		else:
+			# Curtain wipe completed: check if ending sequence qualifies
+			if current_game_type == Constants.GameType.TYPE_A and score_mgr.score >= 30000:
+				start_ending_animation()
+			elif current_game_type == Constants.GameType.TYPE_B and score_mgr.is_goal_reached:
+				start_ending_animation()
+			else:
+				current_state = State.GAME_OVER
+				_emit_game_over()
+
+## Starts the authentic rocket / cathedral launch ending sequence.
+func start_ending_animation() -> void:
+	current_state = State.ENDING_ANIMATION
+	ending_frame_counter = 0
+	ending_completed = false
+	var sc: int = score_mgr.score
+	if sc >= 120000:
+		ending_tier = Constants.RocketTier.TIER_4_CATHEDRAL
+		ending_rocket_y = 199.0
+		ending_rocket_x = 160.0
+	elif sc >= 100000:
+		ending_tier = Constants.RocketTier.TIER_3_LARGE
+		ending_rocket_y = 191.0
+		ending_rocket_x = 72.0
+	elif sc >= 70000:
+		ending_tier = Constants.RocketTier.TIER_2_MEDIUM
+		ending_rocket_y = 191.0
+		ending_rocket_x = 80.0
+	elif sc >= 50000:
+		ending_tier = Constants.RocketTier.TIER_1_MEDIUM_SMALL
+		ending_rocket_y = 191.0
+		ending_rocket_x = 84.0
+	else:
+		ending_tier = Constants.RocketTier.TIER_0_SMALL
+		ending_rocket_y = 191.0
+		ending_rocket_x = 84.0
+	_emit_sfx_requested(Constants.SFX_ROCKET)
+
+func _process_ending_animation(_held_buttons: int, newly_pressed: int) -> void:
+	ending_frame_counter += 1
+	if ending_frame_counter > Constants.ROCKET_LAUNCH_DELAY_FRAMES:
+		if ending_rocket_y > 176.0:
+			if (ending_frame_counter & 1) == 0:
+				ending_rocket_y -= 1.0
+		elif ending_rocket_y > float(Constants.ROCKET_SPEED_ACCEL_Y):
+			ending_rocket_y -= 1.0
+		else:
+			ending_rocket_y -= 2.0
+
+		if ending_rocket_y < -32.0:
+			ending_completed = true
+
+	# Allow player to skip with Start after liftoff has begun, or automatically upon completion
+	if ((newly_pressed & Constants.BUTTON_START) != 0 and ending_frame_counter > Constants.ROCKET_LAUNCH_DELAY_FRAMES) or ending_completed:
+		current_state = State.GAME_OVER
+		_emit_game_over()

@@ -36,6 +36,11 @@ const TITLE_NAMETABLE_ROM_OFFSET: int = 0x003229     # CPU $B219 (title screen c
 const GAME_TYPE_NAMETABLE_ROM_OFFSET: int = 0x00368A  # CPU $B67A (game type menu compressed stream)
 const LEVEL_MENU_NAMETABLE_ROM_OFFSET: int = 0x003AEB # CPU $BADA (level menu compressed stream)
 const HEIGHT_PATCH_ROM_OFFSET: int = 0x00496D        # CPU $C95D (Type A height blanking patch)
+const HIGH_SCORE_NAMETABLE_ROM_OFFSET: int = 0x003D3E # CPU $BD2E (high score screen compressed stream)
+const ENTER_HIGH_SCORE_NAMETABLE_ROM_OFFSET: int = 0x0043AD # CPU $C39D (enter high score compressed stream)
+const TYPE_A_ENDING_NAMETABLE_ROM_OFFSET: int = 0x004E17 # CPU $CE07 (ending screen compressed stream)
+const ENDING_PALETTE_ROM_OFFSET: int = 0x002D53       # CPU $9749 (ending palette 32 bytes + header)
+const DEFAULT_HIGH_SCORES_ROM_OFFSET: int = 0x002D77   # CPU $976D (default high score table)
 
 # --- CHR Bank Offsets & Game Tile Indices ---
 const CHR_BANK_0_TITLE: int = 0
@@ -227,6 +232,29 @@ static func decode_ppu_nametable_stream(stream: PackedByteArray, initial_ppu: Pa
 				addr += inc
 	return ppu
 
+## Decodes NES Tetris charmap byte array to String.
+static func decode_charmap_name(raw_bytes: PackedByteArray) -> String:
+	var result: String = ""
+	for b in raw_bytes:
+		if b >= 0x01 and b <= 0x1A:
+			result += char(65 + b - 1)
+		elif b == 0x2B or b == 0x00:
+			result += " "
+		elif b == 0x2A:
+			result += "."
+		elif b == 0x2C:
+			result += "-"
+		else:
+			result += " "
+	return result
+
+## Decodes a 3-byte BCD score to integer.
+static func decode_bcd_score(b0: int, b1: int, b2: int) -> int:
+	var s0: int = (((b0 >> 4) * 10) + (b0 & 0x0F)) * 10000
+	var s1: int = (((b1 >> 4) * 10) + (b1 & 0x0F)) * 100
+	var s2: int = ((b2 >> 4) * 10) + (b2 & 0x0F)
+	return s0 + s1 + s2
+
 ## Renders a 1024-byte authentic NES nametable (960 tile IDs + 64 attributes)
 ## into a 256x240 Image using 2bpp tiles from CHR Bank 0 and authentic menu palette.
 static func render_nametable_image(nametable: PackedByteArray, chr_bank_0: PackedByteArray, palette_bytes: PackedByteArray) -> Image:
@@ -377,6 +405,9 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	var menu_palette: PackedByteArray = rom_bytes.slice(MENU_PALETTE_ROM_OFFSET + 3, MENU_PALETTE_ROM_OFFSET + 23)
 	result["menu_palette"] = menu_palette
 
+	var ending_palette: PackedByteArray = rom_bytes.slice(ENDING_PALETTE_ROM_OFFSET + 3, ENDING_PALETTE_ROM_OFFSET + 35)
+	result["ending_palette"] = ending_palette
+
 	var ppu_title: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TITLE_NAMETABLE_ROM_OFFSET))
 	var nt_title: PackedByteArray = ppu_title.slice(0x2000, 0x2400)
 	result["title_nametable"] = nt_title
@@ -393,16 +424,65 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	var nt_lvl_a: PackedByteArray = ppu_lvl_a.slice(0x2000, 0x2400)
 	result["level_menu_nametable_a"] = nt_lvl_a
 
-	# 10. Generate 256x240 Authentic Menu Textures (from Bank 0 and Nametables)
+	var ppu_high: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(HIGH_SCORE_NAMETABLE_ROM_OFFSET))
+	var nt_high: PackedByteArray = ppu_high.slice(0x2000, 0x2400)
+	result["high_scores_nametable"] = nt_high
+
+	var ppu_enter: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(ENTER_HIGH_SCORE_NAMETABLE_ROM_OFFSET))
+	var nt_enter: PackedByteArray = ppu_enter.slice(0x2000, 0x2400)
+	result["enter_high_score_nametable"] = nt_enter
+
+	var ppu_ending: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TYPE_A_ENDING_NAMETABLE_ROM_OFFSET))
+	var nt_ending: PackedByteArray = ppu_ending.slice(0x2000, 0x2400)
+	result["type_a_ending_nametable"] = nt_ending
+
+	# 10. Generate 256x240 Authentic Menu & Ending Textures
 	var title_img: Image = render_nametable_image(nt_title, chr_bank_0, menu_palette)
 	var type_img: Image = render_nametable_image(nt_type, chr_bank_0, menu_palette)
 	var lvl_a_img: Image = render_nametable_image(nt_lvl_a, chr_bank_0, menu_palette)
 	var lvl_b_img: Image = render_nametable_image(nt_lvl_b, chr_bank_0, menu_palette)
+	var high_img: Image = render_nametable_image(nt_high, chr_bank_0, menu_palette)
+	var enter_img: Image = render_nametable_image(nt_enter, chr_bank_0, menu_palette)
+	var ending_img: Image = render_nametable_image(nt_ending, chr_bank_2, ending_palette)
 
 	result["title_screen_texture"] = ImageTexture.create_from_image(title_img)
 	result["game_type_menu_texture"] = ImageTexture.create_from_image(type_img)
 	result["level_menu_a_texture"] = ImageTexture.create_from_image(lvl_a_img)
 	result["level_menu_b_texture"] = ImageTexture.create_from_image(lvl_b_img)
+	result["high_scores_texture"] = ImageTexture.create_from_image(high_img)
+	result["enter_high_score_texture"] = ImageTexture.create_from_image(enter_img)
+	result["type_a_ending_texture"] = ImageTexture.create_from_image(ending_img)
+
+	result["title_img"] = title_img
+	result["type_img"] = type_img
+	result["lvl_a_img"] = lvl_a_img
+	result["lvl_b_img"] = lvl_b_img
+	result["high_img"] = high_img
+	result["enter_img"] = enter_img
+	result["ending_img"] = ending_img
+
+	# 11. Extract Authentic Default High Score Table from PRG-ROM
+	var def_scores_a: Array[Dictionary] = []
+	var def_scores_b: Array[Dictionary] = []
+	var hs_offset: int = DEFAULT_HIGH_SCORES_ROM_OFFSET
+	for i in range(3):
+		var name_a: String = decode_charmap_name(rom_bytes.slice(hs_offset + i * 6, hs_offset + (i + 1) * 6))
+		var sc_off_a: int = hs_offset + 48 + i * 3
+		var score_a: int = decode_bcd_score(rom_bytes[sc_off_a], rom_bytes[sc_off_a + 1], rom_bytes[sc_off_a + 2])
+		var level_a: int = rom_bytes[hs_offset + 72 + i]
+		def_scores_a.append({"name": name_a, "score": score_a, "level": level_a})
+
+	for i in range(4, 7):
+		var name_b: String = decode_charmap_name(rom_bytes.slice(hs_offset + i * 6, hs_offset + (i + 1) * 6))
+		var sc_off_b: int = hs_offset + 48 + i * 3
+		var score_b: int = decode_bcd_score(rom_bytes[sc_off_b], rom_bytes[sc_off_b + 1], rom_bytes[sc_off_b + 2])
+		var level_b: int = rom_bytes[hs_offset + 72 + i]
+		def_scores_b.append({"name": name_b, "score": score_b, "level": level_b})
+
+	result["default_high_scores"] = {
+		"scores_a": def_scores_a,
+		"scores_b": def_scores_b,
+	}
 
 	result["success"] = true
 	return result
@@ -459,6 +539,18 @@ static func save_extracted_assets(extraction_result: Dictionary, output_dir: Str
 			t2_img.save_png(output_dir.path_join("tile_secondary_lvl_%d.png" % lvl))
 		if t3_img != null:
 			t3_img.save_png(output_dir.path_join("tile_tertiary_lvl_%d.png" % lvl))
+
+	var high_img: Image = extraction_result.get("high_img") as Image
+	if high_img != null:
+		high_img.save_png(output_dir.path_join("high_scores.png"))
+
+	var enter_img: Image = extraction_result.get("enter_img") as Image
+	if enter_img != null:
+		enter_img.save_png(output_dir.path_join("enter_high_score.png"))
+
+	var ending_img: Image = extraction_result.get("ending_img") as Image
+	if ending_img != null:
+		ending_img.save_png(output_dir.path_join("type_a_ending.png"))
 
 	return true
 

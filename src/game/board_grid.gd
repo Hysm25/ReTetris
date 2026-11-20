@@ -31,6 +31,14 @@ func set_cell(x: int, y: int, value: int) -> void:
 	if is_valid_cell(x, y):
 		cells[y * Constants.GRID_COLUMNS + x] = value
 
+## Fills an entire row across all columns with the given tile type (used for game-over curtain wipe).
+func fill_row(row_idx: int, tile_type: int) -> void:
+	if row_idx < 0 or row_idx >= Constants.GRID_ROWS:
+		return
+	var offset: int = row_idx * Constants.GRID_COLUMNS
+	for c in range(Constants.GRID_COLUMNS):
+		cells[offset + c] = tile_type
+
 func is_occupied(x: int, y: int) -> bool:
 	# Outside left, right, or bottom is considered occupied
 	if x < 0 or x >= Constants.GRID_COLUMNS or y >= Constants.GRID_ROWS:

@@ -42,6 +42,10 @@ func _ready() -> void:
 	renderer.name = "PlayfieldRenderer"
 	add_child(renderer)
 
+	var bus: Node = get_node_or_null("/root/EventBus")
+	if bus != null:
+		bus.game_over.connect(_on_game_over)
+
 	# 5. Mandatory ROM Ingestion Startup Gate
 	var extraction_res: Dictionary = CHRExtractor.auto_ingest_rom()
 	if extraction_res.get("success", false):
@@ -79,6 +83,10 @@ func _on_menu_sfx(sfx_id: int) -> void:
 func _on_menu_music(track_type: int) -> void:
 	if audio_manager != null:
 		audio_manager.set_music_track(track_type)
+
+func _on_game_over() -> void:
+	if menu_ctrl != null and game_state != null:
+		menu_ctrl.handle_game_over(game_state.current_game_type, game_state.score_mgr.score, game_state.score_mgr.level)
 
 func _poll_controller_input() -> int:
 	var mask: int = 0

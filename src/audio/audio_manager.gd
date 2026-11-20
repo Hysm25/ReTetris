@@ -96,6 +96,8 @@ enum SFX {
 	GAME_OVER = 6,
 	CURSOR = 7,
 	MENU_START = 8,
+	CURTAIN = 9,
+	ROCKET = 10,
 }
 
 class ActiveSFX:
@@ -159,6 +161,8 @@ func _connect_event_bus() -> void:
 		bus.connect("level_updated", _on_level_updated)
 	if not bus.is_connected("game_over", _on_game_over):
 		bus.connect("game_over", _on_game_over)
+	if not bus.is_connected("sfx_requested", play_sfx):
+		bus.connect("sfx_requested", play_sfx)
 
 ## Ingests authentic sound engine tables extracted from PRG-ROM.
 func ingest_rom_audio_data(data: Dictionary) -> void:
@@ -215,6 +219,12 @@ func play_sfx(sfx_id: int) -> void:
 		SFX.MENU_START:
 			s.channel = "sq1"
 			s.max_frames = 8
+		SFX.CURTAIN:
+			s.channel = "noise"
+			s.max_frames = 4
+		SFX.ROCKET:
+			s.channel = "noise"
+			s.max_frames = 20
 		_:
 			s.channel = "sq1"
 			s.max_frames = 10
@@ -288,6 +298,14 @@ func _update_sfx() -> void:
 				SFX.MENU_START:
 					sq1.timer_period = 0x0FE if sfx.frame < 4 else 0x07F
 					sq1.volume = 0.6 * (1.0 - progress)
+				SFX.CURTAIN:
+					noise.enabled = true
+					noise.period = 0.002
+					noise.volume = 0.4 * (1.0 - progress)
+				SFX.ROCKET:
+					noise.enabled = true
+					noise.period = 0.003 + float(sfx.frame) * 0.0001
+					noise.volume = 0.5 * (1.0 - progress)
 
 		if sfx.frame >= sfx.max_frames:
 			if sfx.channel == "sq1":

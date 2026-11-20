@@ -79,7 +79,12 @@ var title_screen_texture: ImageTexture = null
 var game_type_menu_texture: ImageTexture = null
 var level_menu_a_texture: ImageTexture = null
 var level_menu_b_texture: ImageTexture = null
+var high_scores_texture: ImageTexture = null
+var enter_high_score_texture: ImageTexture = null
+var type_a_ending_texture: ImageTexture = null
 var menu_palette_colors: Array[Color] = []
+var ending_palette_colors: Array[Color] = []
+var default_high_scores: Dictionary = {}
 
 # Initialization State (Enforces Mandatory ROM Ingestion)
 var is_initialized: bool = false
@@ -216,7 +221,7 @@ func ingest_rom_data(extracted_data: Dictionary) -> bool:
 		var textures: Array[ImageTexture] = [_empty_tile_texture, t1, t2, t3]
 		set_custom_level_textures(lvl, textures)
 
-	# 3. Ingest Authentic Menu Textures
+	# 3. Ingest Authentic Menu & Ending Textures
 	if extracted_data.has("title_screen_texture"):
 		title_screen_texture = extracted_data["title_screen_texture"] as ImageTexture
 	if extracted_data.has("game_type_menu_texture"):
@@ -225,11 +230,24 @@ func ingest_rom_data(extracted_data: Dictionary) -> bool:
 		level_menu_a_texture = extracted_data["level_menu_a_texture"] as ImageTexture
 	if extracted_data.has("level_menu_b_texture"):
 		level_menu_b_texture = extracted_data["level_menu_b_texture"] as ImageTexture
+	if extracted_data.has("high_scores_texture"):
+		high_scores_texture = extracted_data["high_scores_texture"] as ImageTexture
+	if extracted_data.has("enter_high_score_texture"):
+		enter_high_score_texture = extracted_data["enter_high_score_texture"] as ImageTexture
+	if extracted_data.has("type_a_ending_texture"):
+		type_a_ending_texture = extracted_data["type_a_ending_texture"] as ImageTexture
 	if extracted_data.has("menu_palette"):
 		var raw_pal: PackedByteArray = extracted_data["menu_palette"]
 		menu_palette_colors.clear()
 		for b in raw_pal:
 			menu_palette_colors.append(Constants.NES_MASTER_PALETTE[b])
+	if extracted_data.has("ending_palette"):
+		var raw_end_pal: PackedByteArray = extracted_data["ending_palette"]
+		ending_palette_colors.clear()
+		for b in raw_end_pal:
+			ending_palette_colors.append(Constants.NES_MASTER_PALETTE[b])
+	if extracted_data.has("default_high_scores"):
+		default_high_scores = extracted_data["default_high_scores"] as Dictionary
 
 	is_initialized = true
 	return true
@@ -294,6 +312,18 @@ func get_level_menu_texture(game_type: int) -> ImageTexture:
 		return level_menu_b_texture
 	return level_menu_a_texture
 
+func get_high_scores_texture() -> ImageTexture:
+	return high_scores_texture if is_initialized else _empty_tile_texture
+
+func get_enter_high_score_texture() -> ImageTexture:
+	return enter_high_score_texture if is_initialized else _empty_tile_texture
+
+func get_type_a_ending_texture() -> ImageTexture:
+	return type_a_ending_texture if is_initialized else _empty_tile_texture
+
+func get_default_high_scores() -> Dictionary:
+	return default_high_scores
+
 ## Clears custom textures.
 func reset_custom_textures() -> void:
 	_tile_texture_cache.clear()
@@ -302,5 +332,10 @@ func reset_custom_textures() -> void:
 	game_type_menu_texture = null
 	level_menu_a_texture = null
 	level_menu_b_texture = null
+	high_scores_texture = null
+	enter_high_score_texture = null
+	type_a_ending_texture = null
 	menu_palette_colors.clear()
+	ending_palette_colors.clear()
+	default_high_scores.clear()
 	is_initialized = false

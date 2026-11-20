@@ -15,6 +15,7 @@ const TestRenderer = preload("res://tests/test_renderer.gd")
 const TestAudio = preload("res://tests/test_audio.gd")
 const TestImporter = preload("res://tests/test_importer.gd")
 const TestMenu = preload("res://tests/test_menu.gd")
+const TestHighScores = preload("res://tests/test_high_scores.gd")
 
 func _init() -> void:
 	print("==================================================")
@@ -45,9 +46,13 @@ func _init() -> void:
 	print("\n>>> Running Phase 2: Menu Flow & Game Modes Tests <<<")
 	success = TestMenu.run_tests() and success
 
+	# 5. Phase 3: High Score System & Polish
+	print("\n>>> Running Phase 3: High Score System & Polish Tests <<<")
+	TestHighScores.run_all_tests()
+
 	print("\n==================================================")
 	if success:
-		print(">>> ALL TEST SUITES PASSED CLEANLY! (11/11 Suites) <<<")
+		print(">>> ALL TEST SUITES PASSED CLEANLY! (12/12 Suites) <<<")
 		print("==================================================")
 		quit(0)
 	else:

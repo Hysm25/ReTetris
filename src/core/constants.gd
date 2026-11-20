@@ -73,7 +73,27 @@ enum MenuMode {
 	GAME_TYPE_MENU = 2,
 	LEVEL_MENU = 3,
 	IN_GAME = 4,
+	HIGH_SCORE_ENTRY = 5,
+	HIGH_SCORE_TABLE = 6,
+	ENDING_ANIMATION = 7,
 }
+
+# Topout Curtain Wipe Constants (64-frame initial delay, 20 visible rows, 4 frames per row)
+const CURTAIN_INITIAL_DELAY: int = 16
+const CURTAIN_ROWS: int = 20
+const CURTAIN_FRAME_STEP: int = 4
+const CURTAIN_TILE_ID: int = 0x4F
+
+# Ending Sequence & Rocket Constants
+enum RocketTier {
+	TIER_0_SMALL = 0,        # Score 30,000 - 49,999
+	TIER_1_MEDIUM_SMALL = 1, # Score 50,000 - 69,999
+	TIER_2_MEDIUM = 2,       # Score 70,000 - 99,999
+	TIER_3_LARGE = 3,        # Score 100,000 - 119,999
+	TIER_4_CATHEDRAL = 4,    # Score 120,000+
+}
+const ROCKET_LAUNCH_DELAY_FRAMES: int = 240 # 4 seconds launchpad hold before liftoff
+const ROCKET_SPEED_ACCEL_Y: int = 128       # Y position threshold where speed doubles
 
 # Type B Mode Configurations
 const TYPE_B_GOAL_LINES: int = 25
@@ -92,6 +112,8 @@ const TYPE_B_RNG_TABLE: Array[int] = [
 # Audio Menu SFX Identifiers
 const SFX_CURSOR: int = 7
 const SFX_MENU_START: int = 8
+const SFX_CURTAIN: int = 9
+const SFX_ROCKET: int = 10
 
 # --- Tetromino Types ---
 enum PieceType {

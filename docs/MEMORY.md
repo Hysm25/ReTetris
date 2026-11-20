@@ -114,4 +114,16 @@ updated: 2026-11-20
     - Implemented `BoardGrid.setup_type_b_garbage()` generating 0, 3, 5, 8, 10, 12 rows for heights 0..5 using authentic `rngTable` and `typeBGuaranteeBlank` (guaranteed blank holes per row).
     - Implemented 25-line goal countdown and victory bonus `(Level + 1) * 1000 + Height * 1000` in `ScoreManager`.
   - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **11/11 test suites passing cleanly** (including `tests/test_menu.gd`).
-  - **Next Target Milestone**: Phase 3: High Score System & Polish.
+- **Phase 3 Completion (High Score System & Polish)**:
+  - **High Score Manager**: Implemented `src/game/high_score_manager.gd` with Top 3 tables for Game A and Game B, persistent storage in `user://high_scores.dat`, authentic PRG-ROM default high scores (`0x002D77`), and authentic tie-breaking rules (prefers newer score).
+  - **High Score Entry & Table**:
+    - Extracted High Scores nametable (`0x003D3E`) and Enter High Score nametable (`0x0043AD`).
+    - Implemented 6-character initials input with Up/Down character cycling, Left/Right navigation, and held auto-repeat in `MenuController`.
+    - Implemented High Scores Table with Left/Right toggle between A-TYPE and B-TYPE.
+  - **Topout Curtain Wipe Animation**:
+    - Implemented authentic 20-row curtain wipe in `GameStateMachine`: 64-frame initial delay, 20 rows filled (4 frames per row, 80 frames, 148 frames full cycle), and noise channel `SFX_CURTAIN`.
+  - **Rocket Ending Animations**:
+    - Extracted ending screen nametable (`0x004E17`) and ending palette (`0x002D53`).
+    - Implemented 5 authentic score tiers for Type A (30k small, 50k medium-small, 70k medium, 100k large, 120k Saint Basil's cathedral), 240-frame launchpad hold, liftoff climb, and animated thruster flames.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **12/12 test suites passing cleanly** (including `tests/test_high_scores.gd`).
+  - **Next Target Milestone**: Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback.

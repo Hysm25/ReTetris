@@ -104,6 +104,14 @@ func _draw() -> void:
 				_draw_game_type_menu()
 			Constants.MenuMode.LEVEL_MENU:
 				_draw_level_menu()
+			Constants.MenuMode.HIGH_SCORE_ENTRY:
+				_draw_high_score_entry()
+			Constants.MenuMode.HIGH_SCORE_TABLE:
+				_draw_high_score_table()
+		return
+
+	if game_state != null and game_state.current_state == GameStateMachine.State.ENDING_ANIMATION:
+		_draw_ending_animation()
 		return
 
 	_draw_background()
@@ -189,6 +197,139 @@ func _draw_level_menu() -> void:
 
 		if show_h:
 			draw_rect(Rect2(hx, hy, 14, 14), COLOR_BORDER_ACCENT, false, 2.0)
+
+func _draw_high_score_table() -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg != null and reg.has_method("get_high_scores_texture"):
+		var tex: ImageTexture = reg.get_high_scores_texture()
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+		else:
+			draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
+			_draw_text("TOP - 3", Vector2(104, 50), COLOR_WHITE)
+	else:
+		draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
+		_draw_text("TOP - 3", Vector2(104, 50), COLOR_WHITE)
+
+	if menu_ctrl == null or menu_ctrl.get("high_score_mgr") == null:
+		return
+
+	var g_type: int = int(menu_ctrl.get("game_type"))
+	var type_label: String = "A-TYPE" if g_type == Constants.GameType.TYPE_A else "B-TYPE"
+	_draw_text(type_label, Vector2(108, 120), COLOR_WHITE)
+
+	var hs_mgr: RefCounted = menu_ctrl.get("high_score_mgr")
+	var entries: Array = hs_mgr.call("get_entries", g_type)
+
+	var y_offsets: Array[float] = [159.0, 175.0, 191.0]
+	for i in range(mini(3, entries.size())):
+		var entry: Dictionary = entries[i] as Dictionary
+		var y: float = y_offsets[i]
+		var name_str: String = String(entry.get("name", "      "))
+		var score_val: int = int(entry.get("score", 0))
+		var level_val: int = int(entry.get("level", 0))
+
+		_draw_text(name_str, Vector2(72, y), COLOR_WHITE)
+		_draw_text("%06d" % score_val, Vector2(136, y), COLOR_WHITE)
+		_draw_text("%02d" % level_val, Vector2(192, y), COLOR_WHITE)
+
+func _draw_high_score_entry() -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg != null and reg.has_method("get_enter_high_score_texture"):
+		var tex: ImageTexture = reg.get_enter_high_score_texture()
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+		else:
+			draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
+			_draw_text("CONGRATULATIONS", Vector2(72, 50), COLOR_WHITE)
+	else:
+		draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
+		_draw_text("CONGRATULATIONS", Vector2(72, 50), COLOR_WHITE)
+
+	if menu_ctrl == null or menu_ctrl.get("high_score_mgr") == null:
+		return
+
+	var g_type: int = int(menu_ctrl.get("entry_game_type"))
+	var type_label: String = "A-TYPE" if g_type == Constants.GameType.TYPE_A else "B-TYPE"
+	_draw_text(type_label, Vector2(108, 120), COLOR_WHITE)
+
+	var hs_mgr: RefCounted = menu_ctrl.get("high_score_mgr")
+	var entries: Array = hs_mgr.call("get_entries", g_type)
+	var rank: int = int(menu_ctrl.get("entry_rank"))
+	var cursor_idx: int = int(menu_ctrl.get("entry_char_index"))
+	var timer: int = int(menu_ctrl.get("cursor_timer"))
+	var name_chars: Array = menu_ctrl.get("entry_name_chars") as Array
+
+	var y_offsets: Array[float] = [159.0, 175.0, 191.0]
+	for i in range(mini(3, entries.size())):
+		var y: float = y_offsets[i]
+		if i == rank:
+			# Currently edited entry row
+			var full_name: String = "".join(name_chars)
+			_draw_text(full_name, Vector2(72, y), COLOR_WHITE)
+			var sc: int = int(menu_ctrl.get("entry_score"))
+			var lvl: int = int(menu_ctrl.get("entry_level"))
+			_draw_text("%06d" % sc, Vector2(136, y), COLOR_WHITE)
+			_draw_text("%02d" % lvl, Vector2(192, y), COLOR_WHITE)
+
+			# Flashing cursor underline under selected letter
+			if (timer & 0x08) != 0:
+				var cx: float = 72.0 + cursor_idx * 8.0
+				draw_rect(Rect2(cx, y + 1.0, 7.0, 1.0), COLOR_WHITE)
+		else:
+			# Existing high score entry
+			var lookup_idx: int = i if i < rank else i - 1
+			if lookup_idx >= 0 and lookup_idx < entries.size():
+				var entry: Dictionary = entries[lookup_idx] as Dictionary
+				_draw_text(String(entry.get("name", "      ")), Vector2(72, y), COLOR_WHITE)
+				_draw_text("%06d" % int(entry.get("score", 0)), Vector2(136, y), COLOR_WHITE)
+				_draw_text("%02d" % int(entry.get("level", 0)), Vector2(192, y), COLOR_WHITE)
+
+func _draw_ending_animation() -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg != null and reg.has_method("get_type_a_ending_texture"):
+		var tex: ImageTexture = reg.get_type_a_ending_texture()
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+		else:
+			draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), Color("#000033"))
+	else:
+		draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), Color("#000033"))
+
+	if game_state == null:
+		return
+
+	var rx: float = game_state.ending_rocket_x
+	var ry: float = game_state.ending_rocket_y
+	var tier: int = game_state.ending_tier
+	var fc: int = game_state.ending_frame_counter
+
+	# Render rocket body based on score tier
+	var rocket_color: Color = COLOR_WHITE
+	match tier:
+		Constants.RocketTier.TIER_0_SMALL:
+			draw_rect(Rect2(rx, ry, 8.0, 16.0), rocket_color)
+			draw_rect(Rect2(rx + 2.0, ry - 4.0, 4.0, 4.0), COLOR_TEXT_RED)
+		Constants.RocketTier.TIER_1_MEDIUM_SMALL:
+			draw_rect(Rect2(rx - 4.0, ry, 16.0, 24.0), rocket_color)
+			draw_rect(Rect2(rx, ry - 6.0, 8.0, 6.0), COLOR_TEXT_RED)
+		Constants.RocketTier.TIER_2_MEDIUM:
+			draw_rect(Rect2(rx - 8.0, ry, 24.0, 32.0), rocket_color)
+			draw_rect(Rect2(rx - 4.0, ry - 8.0, 16.0, 8.0), COLOR_TEXT_RED)
+		Constants.RocketTier.TIER_3_LARGE:
+			draw_rect(Rect2(rx - 12.0, ry, 32.0, 48.0), rocket_color)
+			draw_rect(Rect2(rx - 6.0, ry - 10.0, 20.0, 10.0), COLOR_TEXT_RED)
+		Constants.RocketTier.TIER_4_CATHEDRAL:
+			draw_rect(Rect2(rx - 24.0, ry, 56.0, 64.0), Color("#CC3333"))
+			draw_rect(Rect2(rx - 16.0, ry - 16.0, 40.0, 16.0), Color("#FFD700"))
+
+	# Render animated thruster jet flames during liftoff
+	if fc >= Constants.ROCKET_LAUNCH_DELAY_FRAMES and ry > -20.0:
+		var flame_toggle: bool = (fc & 0x02) != 0
+		var flame_height: float = 12.0 if flame_toggle else 8.0
+		var flame_color: Color = Color(1.0, 0.6, 0.1, 1.0)
+		draw_rect(Rect2(rx + 1.0, ry + 16.0, 6.0, flame_height), flame_color)
+		draw_rect(Rect2(rx + 2.0, ry + 16.0 + flame_height, 4.0, 4.0), Color(1.0, 0.2, 0.0, 1.0))
 
 func _draw_rom_setup_screen() -> void:
 	draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)

@@ -14,6 +14,7 @@ signal lines_updated(total_lines: int)
 signal level_updated(new_level: int)
 signal game_over()
 signal game_restarted()
+signal sfx_requested(sfx_id: int)
 
 # --- Typed Dispatcher Helpers ---
 

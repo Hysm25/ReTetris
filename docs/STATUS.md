@@ -1,8 +1,8 @@
 # Project Status (`docs/STATUS.md`)
 
 ## Current Phase
-- **Phase 3: High Score System & Polish (Next Target)**
-  - **Context**: Implement the persistent high score system (table, entry screen, signature inputs) and authentic game polish (curtain wipe topout animation, rocket ending sequence).
+- **Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback (Next Target)**
+  - **Context**: Implement the complete multi-channel APU music bytecode interpreter for PRG-ROM BGM streams (`$C737` / `0x004747`) and authentic attract-mode demo sequence.
   - **Rule**: Zero procedural fallbacks. All graphics and palettes sourced directly from extracted ROM assets in `user://nes_data/`.
   - **Completed Foundation**:
     1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
@@ -10,6 +10,66 @@
     3. Baseline Rendering, Audio & Importer (`playfield_renderer.gd`, `audio_manager.gd`, `chr_extractor.gd`, `main.gd`, `main.tscn`)
     4. Mandatory ROM Ingestion Refactor (`chr_extractor.gd`, `content_registry.gd`, `audio_manager.gd`, `main.gd`, `playfield_renderer.gd`)
     5. Phase 2: Menu Flow & Game Modes (`menu_controller.gd`, nametable extraction, Type B mode, level 10-19 shortcut)
+    6. Phase 3: High Score System & Polish (`high_score_manager.gd`, curtain wipe, rocket endings, high score screens)
+
+---
+
+## Phase 3: High Score System & Polish (Completed)
+
+### 1. High Score Persistence & Tables (`src/game/high_score_manager.gd`)
+- [x] Persistent High Score Table with storage in `user://high_scores.dat`:
+  - Stores Top 3 scores for Game Type A and Game Type B with 6-character initials, 6-digit scores, and level numbers.
+  - Authentic defaults extracted directly from PRG-ROM offset `0x002D77`:
+    - Game A: `HOWARD` (10,000, L9), `OTASAN` (7,500, L5), `LANCE ` (5,000, L0).
+    - Game B: `ALEX  ` (2,000, L9), `TONY  ` (1,000, L5), `NINTEN` (500, L0).
+  - Authentic tie-breaking behavior: ties qualify and prefer the newer score.
+  - Graceful fallback to authentic defaults if file is missing or unwritten.
+
+### 2. High Score Entry & Display Screens (`src/game/menu_controller.gd` & `src/game/playfield_renderer.gd`)
+- [x] Authentic Nametable Ingestion & Rendering:
+  - Extracted compressed PPU nametable for High Scores Screen from PRG-ROM offset `0x003D3E` (CPU `$BD2E`).
+  - Extracted compressed PPU nametable for Enter High Score Screen from PRG-ROM offset `0x0043AD` (CPU `$C39D`).
+  - Rendered 256x240 textures using CHR Bank 0 and authentic menu palette.
+- [x] Interactive High Score Entry Screen (`Constants.MenuMode.HIGH_SCORE_ENTRY`):
+  - Automatically triggered upon game over when player score qualifies for Top 3.
+  - 6-character initial input with Up/Down character cycling (A–Z, space, -, .), Left/Right cursor translation, and held auto-repeat.
+  - Flashing letter cursor underline.
+  - Start button commits the entry, inserts score into `HighScoreManager`, and advances to High Score Table.
+- [x] Interactive High Score Table Screen (`Constants.MenuMode.HIGH_SCORE_TABLE`):
+  - Displays Top 3 ranks with authentic pixel alignment: 1st (Y: 159), 2nd (Y: 175), 3rd (Y: 191).
+  - Left/Right controller navigation toggles between `A-TYPE` and `B-TYPE` tables with audio feedback.
+  - Start or Button B returns to Title Screen.
+
+### 3. Topout Curtain Wipe & Rocket Ending Animations (`src/game/`)
+- [x] Authentic 20-Row Curtain Wipe (`State.CURTAIN_WIPE`):
+  - Triggered upon topout (blocked piece entry or lock above visible playfield).
+  - 64-frame initial delay counter (advances from -16 to 0 every 4 frames).
+  - 20-row sequential filling from top to bottom (visible rows 2..21, 4 frames per row, 80 frames total, 148 frames full cycle).
+  - Plays authentic noise channel curtain step sound (`SFX_CURTAIN`).
+- [x] Authentic Rocket Launch Ending Sequence (`State.ENDING_ANIMATION`):
+  - Extracted ending screen nametable from PRG-ROM offset `0x004E17` (CPU `$CE07`) and ending palette from `0x002D53` (CPU `$9749`).
+  - 5 authentic Type A score tiers:
+    - Tier 0: Score 30,000 – 49,999 (Small Rocket)
+    - Tier 1: Score 50,000 – 69,999 (Medium-Small Rocket)
+    - Tier 2: Score 70,000 – 99,999 (Medium Rocket)
+    - Tier 3: Score 100,000 – 119,999 (Large Rocket)
+    - Tier 4: Score 120,000+ (Saint Basil's Cathedral / Buran Rocket)
+  - 240-frame launch pad hold phase before liftoff.
+  - Dual-speed upward climb with animated jet thruster flames toggled at 30 Hz.
+  - Supports Start button skip after launch and automated transition to High Score evaluation.
+
+### 4. Automated Headless Verification
+- [x] Created `tests/test_high_scores.gd` covering 9 comprehensive test suites:
+  - Default HighScoreManager scores for Game A and Game B.
+  - Qualification and tie-breaking prefering newer scores.
+  - High score insertion, shifting, and 4th-entry truncation.
+  - File persistence and disk reloading.
+  - High score entry screen input cycling and submission.
+  - High score table screen navigation and A/B toggle.
+  - 148-frame curtain wipe simulation and playfield coverage.
+  - Rocket ending score tiers, launchpad hold, and liftoff.
+  - Pure GDScript extraction of nametables, palettes, and default high scores from ROM bytes.
+- [x] Verified full headless test suite: **12/12 test suites passing cleanly** via `godot --headless -s tests/test_runner.gd`.
 
 ---
 
@@ -128,7 +188,7 @@
 
 ## Future Phases
 
-### Phase 3: High Score System & Polish
-- [ ] High Score Table with persistent storage in `user://high_scores.dat`.
-- [ ] High Score Entry Screen with 3-character initials input.
-- [ ] Topout animation curtain wipe and ending rocket sequence animations (from CHR Bank 2).
+### Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback
+- [ ] 2A03 APU music bytecode interpreter for PRG-ROM BGM tracks ($C737 / 0x004747).
+- [ ] Attract-mode demo playback from PRG-ROM demo inputs table ($8610 / 0x000620).
+- [ ] Optional low-overhead CRT scanline shader pass for display scaling.
