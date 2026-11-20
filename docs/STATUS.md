@@ -2,12 +2,14 @@
 
 ## Current Phase
 - **Phase 1: Clean-Room Foundation & Core Simulation**
-  - **Completed Milestone**: 1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
-  - **Next Target**: 2. Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, etc.)
+  - **Completed Milestones**:
+    1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
+    2. Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, `piece_controller.gd`, `score_manager.gd`, `game_state_machine.gd`)
+  - **Next Target**: 3. Rendering, Audio & Importer (`playfield_renderer.gd`, `audio_manager.gd`, `chr_extractor.gd`)
 
 ---
 
-## Completed (Setup, Scaffolding & Milestone 1)
+## Completed (Setup, Scaffolding, Milestones 1 & 2)
 - [x] Initialized Git repository with clean-room `.gitignore` (strictly excluding all ROM binaries, dumps, and runtime data).
 - [x] Configured repository environment files (`.editorconfig`, `.gitattributes`).
 - [x] Preserved untouched global context blueprints (`AGENTS.md`, `docs/USER.md`, `docs/SOUL.md`).
@@ -42,49 +44,37 @@
     - Static 4x4 coordinate offset matrices for all tetrominoes across all rotation states.
     - Clean-room procedural 8x8 pixel tile generator creating authentic pixel patterns for `PRIMARY` (bevel), `SECONDARY` (gem), and `TERTIARY` (inset highlight) styles using `Image` and `ImageTexture`.
     - Dynamic level tile texture cache and 32x8 tile atlas generator (`get_level_tile_atlas`).
-  - [x] Implemented headless automated test suite `tests/test_core.gd` and harness `tests/test_runner.gd` (10/10 test suites passed headlessly via Godot 4.7.1).
+- [x] **Milestone 2 Completed & Verified**: Gameplay Simulation Components:
+  - [x] Implemented `src/game/piece_randomizer.gd`:
+    - Authentic 1989 two-roll randomizer ($R_1 \in [0, 7]$, if duplicate or 7, $R_2 \in [0, 6]$) verified statistically over 100,000 rolls with duplicate rate $3.55\%$ (matching theoretical $1/28 \approx 3.57\%$).
+  - [x] Implemented `src/game/board_grid.gd`:
+    - 10x22 cell matrix, fast bounds validation, cell occupancy queries, piece locking, full-row detection, 5-step center-outward clearing, and linear-time multi-row collapse.
+  - [x] Implemented `src/game/das_handler.gd`:
+    - Authentic 16-frame initial charge counter, 6-frame repeat interval (reloaded to 10), directional reversal reset, and pre-charging preserved across ARE and line clears.
+  - [x] Implemented `src/game/piece_controller.gd`:
+    - Active piece translation, NRS rotation strictly rejecting wall/floor kicks, level-based gravity timer, soft drop (1 drop / 2 frames with +1 score), and instant surface contact lock.
+  - [x] Implemented `src/game/score_manager.gd`:
+    - BPS scoring ($40, 100, 300, 1200 \times (\text{level} + 1)$), soft drop point tracking, starting level transition thresholds ($\min(S \times 10 + 10, \max(100, S \times 10 - 50))$), and subsequent 10-line level progression.
+  - [x] Implemented `src/game/game_state_machine.gd`:
+    - Complete finite state machine (`SPAWNING`, `ACTIVE_PLAY`, `LINE_CLEAR_ANIM`, `ARE_DELAY`, `GAME_OVER`), deterministic 60 TPS `_physics_process` loop, ARE delay calculation, 20-frame 5-step center-outward line clear sequence, and spawn row lockout detection.
+- [x] Implemented comprehensive automated headless test harness (`tests/test_runner.gd`) executing 7 test suites (`test_core.gd`, `test_randomizer.gd`, `test_board_grid.gd`, `test_das.gd`, `test_piece_controller.gd`, `test_score_manager.gd`, `test_game_simulation.gd`) passing 100% of assertions.
 
 ---
 
 ## Phase 1 Implementation Roadmap (Pending)
 
 ### 1. Core Autoloads & Enums (Completed)
-- [x] Implement `src/core/constants.gd`:
-  - Tetromino IDs (`T`, `J`, `Z`, `O`, `S`, `L`, `I`), orientations (0..3 or 0..1), grid dimensions (10x22, 10x20 visible).
-  - NTSC gravity frames lookup table (Levels 0 through 29+).
-  - BPS scoring coefficients (40, 100, 300, 1200) and starting level transition formulas.
-  - Authentic NES 64-color master palette & level color schemes (Levels 0-9 cycling).
-- [x] Implement `src/core/event_bus.gd`:
-  - Full implementation of typed global signals for simulation lifecycle (`spawned`, `moved`, `rotated`, `locked`, `clearing`, `cleared`, `score_updated`, `level_updated`, `game_over`).
-- [x] Implement `src/core/content_registry.gd`:
-  - Static 4x4 coordinate offset matrices for all 7 tetrominoes across all rotation states.
-  - Clean-room procedural 8x8 pixel tile generator (bevel, gem, and block styles via `Image`/`ImageTexture`).
-  - Level palette lookup and dynamic tile atlas generation.
+- [x] `src/core/constants.gd`
+- [x] `src/core/event_bus.gd`
+- [x] `src/core/content_registry.gd`
 
-### 2. Gameplay Simulation Components
-- [ ] Implement `src/game/piece_randomizer.gd`:
-  - Authentic 1989 two-roll randomizer algorithm ($R_1 \in [0, 7]$, if duplicate or 7, $R_2 \in [0, 6]$).
-- [ ] Implement `src/game/board_grid.gd`:
-  - 10x22 2D cell storage with fast bounds checking and occupancy queries.
-  - Piece locking into grid cells.
-  - Full-row detection, 5-step center-outward row clearing, and row collapse.
-- [ ] Implement `src/game/das_handler.gd`:
-  - Frame-accurate 16-frame initial charge counter and 6-frame repeat interval.
-  - Directional change reset and DAS preservation across piece locks and ARE delays.
-- [ ] Implement `src/game/piece_controller.gd`:
-  - Active piece translation, NRS rotation (strictly validating against grid bounds and occupied cells with zero kicks).
-  - Frame-accurate gravity step accumulator governed by level timing table.
-  - Soft drop handling (1 drop every 2 frames, +1 score per cell).
-  - Instant locking on contact without modern grace periods.
-- [ ] Implement `src/game/game_state_machine.gd`:
-  - Finite State Machine: `SPAWNING`, `ACTIVE_PLAY`, `ARE_DELAY`, `LINE_CLEAR_ANIM`, `GAME_OVER`.
-  - Authentic entry delay calculation: $\text{ARE} = 10 + 2 \times \lfloor (21 - Y_{\text{lock}}) / 4 \rfloor$ frames.
-  - 20-frame (5 steps $\times$ 4 frames) center-outward line clear animation.
-  - Top-out / lockout detection in spawn rows 0-1.
-- [ ] Implement `src/game/score_manager.gd`:
-  - BPS line clear scoring formula ($40, 100, 300, 1200 \times (\text{Level} + 1)$).
-  - Soft drop point accumulation.
-  - Starting level transition threshold $\min(S \times 10 + 10, \max(100, S \times 10 - 50))$ and subsequent 10-line level advancement.
+### 2. Gameplay Simulation Components (Completed)
+- [x] `src/game/piece_randomizer.gd`
+- [x] `src/game/board_grid.gd`
+- [x] `src/game/das_handler.gd`
+- [x] `src/game/piece_controller.gd`
+- [x] `src/game/score_manager.gd`
+- [x] `src/game/game_state_machine.gd`
 
 ### 3. Rendering, Audio & Importer
 - [ ] Implement `src/game/playfield_renderer.gd`:
