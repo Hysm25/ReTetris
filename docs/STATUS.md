@@ -1,12 +1,13 @@
 # Project Status (`docs/STATUS.md`)
 
 ## Current Phase
-- **Phase 0: Project Setup & Technical Specification (Clean-Slate Baseline)**
-- **Next Target**: Phase 1: Clean-Room Foundation & Core Simulation
+- **Phase 1: Clean-Room Foundation & Core Simulation**
+  - **Completed Milestone**: 1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
+  - **Next Target**: 2. Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, etc.)
 
 ---
 
-## Completed (Setup & Scaffolding)
+## Completed (Setup, Scaffolding & Milestone 1)
 - [x] Initialized Git repository with clean-room `.gitignore` (strictly excluding all ROM binaries, dumps, and runtime data).
 - [x] Configured repository environment files (`.editorconfig`, `.gitattributes`).
 - [x] Preserved untouched global context blueprints (`AGENTS.md`, `docs/USER.md`, `docs/SOUL.md`).
@@ -25,20 +26,37 @@
   - Registered `EventBus` and `ContentRegistry` autoload declarations.
 - [x] Established project directory scaffolding (`src/core/`, `src/game/`, `src/audio/`, `src/importer/`, `tests/`).
 - [x] Authored repository `README.md` reflecting clean-room scope and pre-implementation baseline.
+- [x] **Milestone 1 Completed & Verified**: Core Autoloads & Enums:
+  - [x] Implemented `src/core/constants.gd`:
+    - Full 7 tetromino definitions (`T`, `J`, `Z`, `O`, `S`, `L`, `I`), 20 authentic NES orientations, playfield geometry (10x22 grid, 10x20 visible, 2 hidden spawn rows, 256x240 viewport, screen offsets).
+    - Authentic NTSC gravity frames lookup table (Levels 0 through 29+).
+    - BPS scoring coefficients (40, 100, 300, 1200) and starting level transition formulas ($\min(S \times 10 + 10, \max(100, S \times 10 - 50))$).
+    - Authentic NES 64-color master palette & 10 cycling level palettes (Levels 0-9) matching NES disassembly color tables.
+    - DAS constants (16 charge, 6 repeat, 10 reload) and ARE formulas ($10 + 2 \times \lfloor(21 - Y_{\text{lock}})/4\rfloor$).
+    - Full bidirectional NRS rotation tables (`ROTATION_TABLE_CW`, `ROTATION_TABLE_CCW`).
+  - [x] Implemented `src/core/event_bus.gd`:
+    - Fully typed global signal dispatcher for simulation lifecycle (`piece_spawned`, `piece_moved`, `piece_rotated`, `piece_locked`, `lines_clearing`, `lines_cleared`, `score_updated`, `lines_updated`, `level_updated`, `game_over`, `game_restarted`).
+    - Helper typed emitter methods for decoupled architecture.
+  - [x] Implemented `src/core/content_registry.gd`:
+    - Authentic mino relative offset coordinates `ORIENTATION_MINO_OFFSETS` for all 20 orientations.
+    - Static 4x4 coordinate offset matrices for all tetrominoes across all rotation states.
+    - Clean-room procedural 8x8 pixel tile generator creating authentic pixel patterns for `PRIMARY` (bevel), `SECONDARY` (gem), and `TERTIARY` (inset highlight) styles using `Image` and `ImageTexture`.
+    - Dynamic level tile texture cache and 32x8 tile atlas generator (`get_level_tile_atlas`).
+  - [x] Implemented headless automated test suite `tests/test_core.gd` and harness `tests/test_runner.gd` (10/10 test suites passed headlessly via Godot 4.7.1).
 
 ---
 
 ## Phase 1 Implementation Roadmap (Pending)
 
-### 1. Core Autoloads & Enums
-- [ ] Implement `src/core/constants.gd`:
+### 1. Core Autoloads & Enums (Completed)
+- [x] Implement `src/core/constants.gd`:
   - Tetromino IDs (`T`, `J`, `Z`, `O`, `S`, `L`, `I`), orientations (0..3 or 0..1), grid dimensions (10x22, 10x20 visible).
   - NTSC gravity frames lookup table (Levels 0 through 29+).
   - BPS scoring coefficients (40, 100, 300, 1200) and starting level transition formulas.
   - Authentic NES 64-color master palette & level color schemes (Levels 0-9 cycling).
-- [ ] Implement `src/core/event_bus.gd`:
+- [x] Implement `src/core/event_bus.gd`:
   - Full implementation of typed global signals for simulation lifecycle (`spawned`, `moved`, `rotated`, `locked`, `clearing`, `cleared`, `score_updated`, `level_updated`, `game_over`).
-- [ ] Implement `src/core/content_registry.gd`:
+- [x] Implement `src/core/content_registry.gd`:
   - Static 4x4 coordinate offset matrices for all 7 tetrominoes across all rotation states.
   - Clean-room procedural 8x8 pixel tile generator (bevel, gem, and block styles via `Image`/`ImageTexture`).
   - Level palette lookup and dynamic tile atlas generation.

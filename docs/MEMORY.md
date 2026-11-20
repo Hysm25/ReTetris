@@ -78,4 +78,12 @@ updated: 2026-11-20
   - Native 256x240 viewport resolution with integer scaling override (768x720, 3x scale).
   - Nearest-neighbor texture filter (`default_texture_filter = 0`).
   - 60 TPS physics tick rate.
-- **Current Execution Status**: Clean-slate pre-implementation baseline. Zero gameplay logic, controllers, or test suites have been implemented yet. Initial stubs in `src/` exist purely as structural placeholders awaiting Phase 1 execution.
+- **Current Execution Status**:
+  - **Milestone 1 Completed**: Core Autoloads & Enums (`src/core/constants.gd`, `src/core/event_bus.gd`, `src/core/content_registry.gd`).
+  - **Headless Verification**: Executed and verified headlessly via `godot --headless --path . --quit` and `godot --headless -s tests/test_runner.gd` (Godot 4.7.1 on Fedora PRoot ARM64), passing 10/10 automated test suites with zero errors or warnings.
+  - **Components Implemented**:
+    1. `src/core/constants.gd`: Strictly typed constants for playfield geometry (10x22 grid, 10x20 visible, 2 hidden rows, 256x240 viewport), 7 tetromino types, 20 authentic orientations, full bidirectional NRS rotation tables (`ROTATION_TABLE_CW`, `ROTATION_TABLE_CCW`), 60 TPS gravity lookup table (levels 0 to 29+), BPS scoring formulas, starting level transition thresholds ($\min(S \times 10 + 10, \max(100, S \times 10 - 50))$), base ARE formulas, 64-color NES master palette, and 10 level color schemes.
+    2. `src/core/event_bus.gd`: Decoupled global signal dispatcher for simulation lifecycle events (`piece_spawned`, `piece_moved`, `piece_rotated`, `piece_locked`, `lines_clearing`, `lines_cleared`, `score_updated`, `lines_updated`, `level_updated`, `game_over`, `game_restarted`) with typed emitter helpers.
+    3. `src/core/content_registry.gd`: Authentic relative mino coordinates for 20 orientations, precomputed 4x4 coordinate offset matrices, algorithmic procedural 8x8 pixel tile generator reproducing authentic NES `PRIMARY` (bevel), `SECONDARY` (gem), and `TERTIARY` (inset highlight) tile styles via `Image` and `ImageTexture`, dynamic level tile caching, and 32x8 tile atlas generation.
+    4. `tests/test_core.gd` & `tests/test_runner.gd`: 10 headless assertion test suites verifying dimensions, NRS rotations, gravity/scoring formulas, starting level thresholds, ARE formulas, palettes, EventBus dispatching, 4x4 matrices, procedural tile images, and atlas caching.
+  - **Next Target**: Phase 1, Milestone 2: Gameplay Simulation Components (`src/game/piece_randomizer.gd`, `src/game/board_grid.gd`, `src/game/das_handler.gd`, etc.).
