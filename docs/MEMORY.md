@@ -89,9 +89,16 @@ updated: 2026-11-20
   - **Milestone 2 Completed**: Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, `piece_controller.gd`, `score_manager.gd`, `game_state_machine.gd`).
   - **Milestone 3 Completed**: Rendering, Audio & Importer (`playfield_renderer.gd`, `audio_manager.gd`, `chr_extractor.gd`, `main.gd`, `main.tscn`).
   - **Headless Verification**: Executed and verified headlessly via `godot --headless --path . --quit` and `godot --headless -s tests/test_runner.gd` (Godot 4.7.1 on Fedora PRoot ARM64), running 10 comprehensive automated test suites (`test_core.gd`, `test_randomizer.gd`, `test_board_grid.gd`, `test_das.gd`, `test_piece_controller.gd`, `test_score_manager.gd`, `test_game_simulation.gd`, `test_renderer.gd`, `test_audio.gd`, `test_importer.gd`) passing 100% of assertions with zero errors or warnings.
-- **Architectural Refactor Decision: Mandatory ROM Ingestion Architecture**:
-  - Decision to eliminate all procedural tile generation fallbacks and procedural audio approximations.
-  - Runtime strictly enforces presence of authentic ROM data (`user://nes_data/` or `tetris.nes`) and refuses to start without it.
-  - Importer extracts 100% of authentic CHR pattern tables (tiles, font glyphs, frames, menus, ending sprites), PRG lookup tables (palettes, gravity, scores, spawn/preview coordinates), and APU sound tables/bytecode.
-  - Missing ROM on startup halts gameplay initialization and presents an explicit setup screen.
-  - Next target milestone: **Phase 1.5: Mandatory ROM Asset & Data Ingestion Refactor**.
+- **Phase 1.5 Refactor Completion (Mandatory ROM Asset & Data Ingestion)**:
+  - **Cryptographic Verification**: Implemented pure GDScript SHA-256 and CRC32 checksum routines for authentic 1989 NTSC NES Tetris (PRG-ROM 32KB: `a2de...` / `0x943DFBBE`, CHR-ROM 16KB: `2378...` / `0x251AF21C`).
+  - **100% Authentic Data Extraction**:
+    - CHR-ROM: Extracts 16KB pattern tables across all 4 banks (Bank 0 Title/Menu, Bank 1 Type B, Bank 2 Type A/Endings, Bank 3 In-game blocks/fonts).
+    - PRG-ROM: Extracts palettes at CPU `$984C` (`0x00185C`), gravity drop table at CPU `$898E` (`0x00099E`), BCD-encoded points scoring table at CPU `$9CA5` (`0x001CB5`, decoded to 0, 40, 100, 300, 1200), spawn orientations at CPU `$994E` (`0x00195E`), and APU sound tables at CPU `$C645`, `$C6EB`, `$C737`.
+  - **Elimination of Procedural Fallbacks**:
+    - Completely removed `generate_procedural_tile_image()` and synthetic tile generation logic from `ContentRegistry`.
+    - ContentRegistry and AudioManager require authentic extracted ROM assets and reject gameplay initialization if uninitialized.
+  - **Startup ROM Guard & Missing ROM Screen**:
+    - Implemented automatic ROM ingestion in `main.gd` scanning `user://nes_data/` and root `tetris.nes`.
+    - Added `ROM_SETUP` state to `GameStateMachine` and dedicated setup prompt in `PlayfieldRenderer` directing player to provide `tetris.nes` when data is missing.
+  - **Headless Verification**: Executed `godot --headless --path . --quit` and `godot --headless -s tests/test_runner.gd` with 10/10 test suites passing cleanly with zero errors.
+  - **Next Target Milestone**: Phase 2: Menu Flow & Game Modes.

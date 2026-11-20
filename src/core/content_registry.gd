@@ -1,7 +1,8 @@
 extends Node
 
-## Central registry for NES Tetris tables, tetromino geometries, palettes, and textures.
-## Manages static tetromino matrices, procedural 8x8 tile generation, and palette banks.
+## Central repository for authentic 1989 NES Tetris tables, tetromino geometries, and textures.
+## Operates under Mandatory ROM Ingestion: all palettes, tiles, and tables are populated exclusively
+## from authentic ROM dumps. Zero procedural tile synthesis fallbacks are present.
 
 const Constants = preload("res://src/core/constants.gd")
 
@@ -61,19 +62,36 @@ const ORIENTATION_MINO_OFFSETS: Array[Array] = [
 # Static 4x4 coordinate offset matrices for all 20 orientations (values: 0=empty, 1..3=tile type)
 var matrices_4x4: Array[Array] = []
 
-# Cached textures: level -> Array[ImageTexture] (indexed by TileType 0..3)
+# Cached extracted textures: level -> Array[ImageTexture] (indexed by TileType 0..3)
 var _tile_texture_cache: Dictionary = {}
 
 # Cached atlas textures: level -> ImageTexture (32x8 atlas)
 var _atlas_texture_cache: Dictionary = {}
 
+# Extracted PRG-ROM Data Tables
+var extracted_gravity_table: Array[int] = []
+var extracted_points_table: Array[int] = []
+var extracted_color_table: Array[Array] = []
+var extracted_spawn_orientations: Array[int] = []
+
+# Initialization State (Enforces Mandatory ROM Ingestion)
+var is_initialized: bool = false
+
+# Blank 8x8 transparent fallback texture
+var _empty_tile_texture: ImageTexture = null
+
 func _init() -> void:
 	_build_matrices_4x4()
+	_create_empty_tile()
+
+func _create_empty_tile() -> void:
+	var empty_img: Image = Image.create(Constants.TILE_SIZE, Constants.TILE_SIZE, false, Image.FORMAT_RGBA8)
+	empty_img.fill(Color(0.0, 0.0, 0.0, 0.0))
+	_empty_tile_texture = ImageTexture.create_from_image(empty_img)
 
 func _build_matrices_4x4() -> void:
 	matrices_4x4.clear()
 	for orientation_idx in range(Constants.ORIENTATION_COUNT):
-		# Create empty 4x4 matrix
 		var mat: Array[Array] = []
 		for r in range(4):
 			var row: Array[int] = [0, 0, 0, 0]
@@ -112,6 +130,9 @@ func get_matrix_4x4(orientation: int) -> Array[Array]:
 	return matrices_4x4[orientation]
 
 func get_piece_spawn_orientation(piece_type: int) -> int:
+	if extracted_spawn_orientations.size() == Constants.PIECE_COUNT:
+		if piece_type >= 0 and piece_type < extracted_spawn_orientations.size():
+			return extracted_spawn_orientations[piece_type]
 	if piece_type < 0 or piece_type >= Constants.PIECE_COUNT:
 		return Constants.Orientation.T_DOWN
 	return Constants.SPAWN_ORIENTATIONS[piece_type]
@@ -121,150 +142,124 @@ func get_tile_type_for_piece(piece_type: int) -> int:
 		return Constants.TileType.EMPTY
 	return Constants.TILE_TYPE_FROM_PIECE[piece_type]
 
-# --- Gravity & Timing Lookups ---
+# --- Gravity, Scoring & Palette Lookups from Extracted Tables ---
 
 func get_gravity_frames(level: int) -> int:
+	if extracted_gravity_table.size() >= 30:
+		var clamped: int = clampi(level, 0, extracted_gravity_table.size() - 1)
+		return extracted_gravity_table[clamped]
 	return Constants.get_gravity_frames(level)
 
+func get_score_points(lines: int) -> int:
+	if extracted_points_table.size() == 5:
+		if lines >= 0 and lines < 5:
+			return extracted_points_table[lines]
+	if lines >= 0 and lines < Constants.SCORE_POINTS_PER_LINES.size():
+		return Constants.SCORE_POINTS_PER_LINES[lines]
+	return 0
+
 func get_level_palette(level: int) -> Array[Color]:
+	var level_idx: int = absi(level) % 10
+	if extracted_color_table.size() == 10:
+		var indices: Array = extracted_color_table[level_idx]
+		if indices.size() >= 4:
+			return [
+				Constants.NES_MASTER_PALETTE[indices[1]],
+				Constants.NES_MASTER_PALETTE[indices[2]],
+				Constants.NES_MASTER_PALETTE[indices[3]],
+			]
 	return Constants.get_level_palette(level)
 
-# --- Procedural 8x8 Tile Generation ---
+# --- Mandatory ROM Data Ingestion ---
 
-## Generates a procedural 8x8 Image matching authentic NES Tetris pixel styles:
-## TileType.PRIMARY (1): Bevelled / Frame style (tile 1)
-## TileType.SECONDARY (2): Specular Gem style (tile 2)
-## TileType.TERTIARY (3): Primary with top-left highlight (tile 3)
-## TileType.EMPTY (0): Fully transparent
-func generate_procedural_tile_image(tile_type: int, palette: Array[Color]) -> Image:
-	var img: Image = Image.create(Constants.TILE_SIZE, Constants.TILE_SIZE, false, Image.FORMAT_RGBA8)
-	
-	if tile_type == Constants.TileType.EMPTY or palette.size() < 3:
-		img.fill(Color(0.0, 0.0, 0.0, 0.0))
-		return img
+## Ingests 100% authentic tables, palettes, and textures extracted from ROM.
+func ingest_rom_data(extracted_data: Dictionary) -> bool:
+	if not extracted_data.get("success", false):
+		return false
 
-	var color_pri: Color = palette[0]
-	var color_sec: Color = palette[1]
-	var color_white: Color = palette[2]
-	var color_shadow: Color = Color(0.0, 0.0, 0.0, 1.0)
+	# 1. Ingest PRG Tables
+	if extracted_data.has("gravity_table"):
+		extracted_gravity_table.clear()
+		for val in extracted_data["gravity_table"]:
+			extracted_gravity_table.append(int(val))
+	if extracted_data.has("points_table"):
+		extracted_points_table.clear()
+		for val in extracted_data["points_table"]:
+			extracted_points_table.append(int(val))
+	if extracted_data.has("color_table"):
+		extracted_color_table.clear()
+		for pal in extracted_data["color_table"]:
+			var pal_arr: Array = []
+			for idx in pal:
+				pal_arr.append(int(idx))
+			extracted_color_table.append(pal_arr)
+	if extracted_data.has("spawn_orientations"):
+		extracted_spawn_orientations.clear()
+		for val in extracted_data["spawn_orientations"]:
+			extracted_spawn_orientations.append(int(val))
 
-	# Raw 8x8 pixel index mapping (0=Shadow/Border, 1=White, 2=Secondary, 3=Primary)
-	# Directly reproduced from authentic NES Tetris CHR-ROM Game Bank 3 ($7B, $7C, $7D)
-	var pattern: Array[int] = []
+	# 2. Ingest CHR Textures
+	var level_textures: Array = extracted_data.get("level_textures", [])
+	for lvl in range(level_textures.size()):
+		var entry: Dictionary = level_textures[lvl] as Dictionary
+		var t1: ImageTexture = entry.get("tile_1") as ImageTexture
+		var t2: ImageTexture = entry.get("tile_2") as ImageTexture
+		var t3: ImageTexture = entry.get("tile_3") as ImageTexture
 
-	match tile_type:
-		Constants.TileType.PRIMARY:
-			# Tile $7B: Bevelled frame block
-			pattern = [
-				1, 3, 3, 3, 3, 3, 3, 0,
-				3, 1, 1, 1, 1, 1, 3, 0,
-				3, 1, 1, 1, 1, 1, 3, 0,
-				3, 1, 1, 1, 1, 1, 3, 0,
-				3, 1, 1, 1, 1, 1, 3, 0,
-				3, 1, 1, 1, 1, 1, 3, 0,
-				3, 3, 3, 3, 3, 3, 3, 0,
-				0, 0, 0, 0, 0, 0, 0, 0,
-			]
-		Constants.TileType.SECONDARY:
-			# Tile $7C: Gem / Specular block
-			pattern = [
-				1, 2, 2, 2, 2, 2, 2, 0,
-				2, 1, 1, 2, 2, 2, 2, 0,
-				2, 1, 2, 2, 2, 2, 2, 0,
-				2, 2, 2, 2, 2, 2, 2, 0,
-				2, 2, 2, 2, 2, 2, 2, 0,
-				2, 2, 2, 2, 2, 2, 2, 0,
-				2, 2, 2, 2, 2, 2, 2, 0,
-				0, 0, 0, 0, 0, 0, 0, 0,
-			]
-		Constants.TileType.TERTIARY:
-			# Tile $7D: Primary with specular highlight
-			pattern = [
-				1, 3, 3, 3, 3, 3, 3, 0,
-				3, 1, 1, 3, 3, 3, 3, 0,
-				3, 1, 3, 3, 3, 3, 3, 0,
-				3, 3, 3, 3, 3, 3, 3, 0,
-				3, 3, 3, 3, 3, 3, 3, 0,
-				3, 3, 3, 3, 3, 3, 3, 0,
-				3, 3, 3, 3, 3, 3, 3, 0,
-				0, 0, 0, 0, 0, 0, 0, 0,
-			]
-		_:
-			img.fill(Color(0.0, 0.0, 0.0, 0.0))
-			return img
+		var textures: Array[ImageTexture] = [_empty_tile_texture, t1, t2, t3]
+		set_custom_level_textures(lvl, textures)
 
-	for y in range(8):
-		for x in range(8):
-			var idx: int = pattern[y * 8 + x]
-			var c: Color
-			match idx:
-				0:
-					c = color_shadow
-				1:
-					c = color_white
-				2:
-					c = color_sec
-				3:
-					c = color_pri
-				_:
-					c = color_shadow
-			img.set_pixel(x, y, c)
+	is_initialized = true
+	return true
 
-	return img
+func is_ready() -> bool:
+	return is_initialized
 
-# --- Texture & Atlas Cache ---
+# --- Texture & Atlas Cache Access ---
 
-## Retrieves or generates the cached ImageTexture for a given tile type at a specific level.
+## Retrieves the extracted ImageTexture for a given tile type at a specific level.
+## Refuses procedural fallback: returns empty texture if uninitialized.
 func get_tile_texture(tile_type: int, level: int) -> ImageTexture:
 	var level_idx: int = absi(level) % 10
-	if not _tile_texture_cache.has(level_idx):
-		_generate_level_textures(level_idx)
-	
-	var textures: Array = _tile_texture_cache[level_idx] as Array
-	if tile_type >= 0 and tile_type < textures.size():
-		return textures[tile_type] as ImageTexture
-	return textures[0] as ImageTexture
+	if _tile_texture_cache.has(level_idx):
+		var textures: Array = _tile_texture_cache[level_idx] as Array
+		if tile_type >= 0 and tile_type < textures.size():
+			return textures[tile_type] as ImageTexture
 
-## Retrieves or generates a 32x8 ImageTexture atlas containing all 4 tiles [EMPTY, PRIMARY, SECONDARY, TERTIARY]
+	return _empty_tile_texture
+
+## Retrieves a 32x8 ImageTexture atlas containing all 4 tiles [EMPTY, PRIMARY, SECONDARY, TERTIARY].
 func get_level_tile_atlas(level: int) -> ImageTexture:
 	var level_idx: int = absi(level) % 10
-	if not _atlas_texture_cache.has(level_idx):
-		_generate_level_atlas(level_idx)
-	return _atlas_texture_cache[level_idx] as ImageTexture
+	if _atlas_texture_cache.has(level_idx):
+		return _atlas_texture_cache[level_idx] as ImageTexture
 
-func _generate_level_textures(level_idx: int) -> void:
-	var palette: Array[Color] = Constants.get_level_palette(level_idx)
-	var textures: Array[ImageTexture] = []
+	if _tile_texture_cache.has(level_idx):
+		var textures: Array = _tile_texture_cache[level_idx] as Array
+		var atlas_img: Image = Image.create(32, 8, false, Image.FORMAT_RGBA8)
+		atlas_img.fill(Color(0.0, 0.0, 0.0, 0.0))
 
-	for t in range(4):
-		var img: Image = generate_procedural_tile_image(t, palette)
-		var tex: ImageTexture = ImageTexture.create_from_image(img)
-		textures.append(tex)
+		for t in range(mini(4, textures.size())):
+			var tex: ImageTexture = textures[t] as ImageTexture
+			if tex != null:
+				var img: Image = tex.get_image()
+				if img != null:
+					atlas_img.blit_rect(img, Rect2i(0, 0, 8, 8), Vector2i(t * 8, 0))
 
-	_tile_texture_cache[level_idx] = textures
+		var atlas_tex: ImageTexture = ImageTexture.create_from_image(atlas_img)
+		_atlas_texture_cache[level_idx] = atlas_tex
+		return atlas_tex
 
-func _generate_level_atlas(level_idx: int) -> void:
-	var palette: Array[Color] = Constants.get_level_palette(level_idx)
-	# Atlas contains 4 tiles side-by-side: 4 * 8 = 32 width, 8 height
-	var atlas_img: Image = Image.create(32, 8, false, Image.FORMAT_RGBA8)
-	atlas_img.fill(Color(0.0, 0.0, 0.0, 0.0))
+	return _empty_tile_texture
 
-	for t in range(4):
-		var tile_img: Image = generate_procedural_tile_image(t, palette)
-		atlas_img.blit_rect(tile_img, Rect2i(0, 0, 8, 8), Vector2i(t * 8, 0))
-
-	var atlas_tex: ImageTexture = ImageTexture.create_from_image(atlas_img)
-	_atlas_texture_cache[level_idx] = atlas_tex
-
-## Allows injecting custom/extracted textures (e.g. from CHRExtractor) for a given level.
-## Array must contain 4 ImageTextures: [EMPTY, PRIMARY, SECONDARY, TERTIARY].
+## Allows injecting custom/extracted textures for a given level.
 func set_custom_level_textures(level_idx: int, textures: Array[ImageTexture]) -> void:
 	var idx: int = absi(level_idx) % 10
 	_tile_texture_cache[idx] = textures
 	_atlas_texture_cache.erase(idx)
 
-## Clears custom textures and restores default procedural generation.
+## Clears custom textures.
 func reset_custom_textures() -> void:
 	_tile_texture_cache.clear()
 	_atlas_texture_cache.clear()
-
+	is_initialized = false

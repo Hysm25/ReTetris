@@ -89,6 +89,10 @@ func _process(_delta: float) -> void:
 # --- Draw Logic ---
 
 func _draw() -> void:
+	if game_state != null and game_state.current_state == GameStateMachine.State.ROM_SETUP:
+		_draw_rom_setup_screen()
+		return
+
 	_draw_background()
 	_draw_playfield_frame()
 	_draw_playfield_matrix()
@@ -97,6 +101,20 @@ func _draw() -> void:
 	_draw_hud()
 	if is_game_over:
 		_draw_game_over_banner()
+
+func _draw_rom_setup_screen() -> void:
+	draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
+	# Red warning border
+	draw_rect(Rect2(12, 12, 232, 216), COLOR_TEXT_RED, false, 2.0)
+
+	_draw_text("TETRIS ROM REQUIRED", Vector2(48, 50), COLOR_TEXT_RED)
+	_draw_text("Mandatory Ingestion Mode", Vector2(40, 75), COLOR_WHITE)
+	_draw_text("Zero Procedural Fallbacks", Vector2(36, 95), COLOR_BORDER_ACCENT)
+	_draw_text("Please supply a valid", Vector2(44, 125), COLOR_WHITE)
+	_draw_text("1989 NES Tetris ROM at:", Vector2(44, 140), COLOR_WHITE)
+	_draw_text("user://nes_data/tetris.nes", Vector2(32, 160), COLOR_TEXT_RED)
+	_draw_text("or in the workspace root.", Vector2(36, 175), COLOR_WHITE)
+	_draw_text("Then restart the game.", Vector2(44, 205), COLOR_BORDER_ACCENT)
 
 func _draw_background() -> void:
 	# 256x240 dark canvas background

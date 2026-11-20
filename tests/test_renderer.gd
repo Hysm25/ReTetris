@@ -14,6 +14,7 @@ static func run_tests() -> bool:
 	test_preview_anchor_calculation()
 	test_renderer_instantiation_and_sync()
 	test_event_bus_updates()
+	test_rom_setup_screen_rendering()
 	print("  -> TestRenderer: PASSED")
 	return true
 
@@ -90,3 +91,15 @@ static func test_event_bus_updates() -> void:
 	assert(renderer.piece_stats[Constants.PieceType.T] == 0, "Piece stats must reset on restart")
 
 	renderer.free()
+
+static func test_rom_setup_screen_rendering() -> void:
+	var fsm = GameStateMachine.new()
+	fsm.is_headless_testing = true
+	fsm.current_state = GameStateMachine.State.ROM_SETUP
+
+	var renderer = PlayfieldRenderer.new(fsm)
+	renderer._process(0.016)
+	assert(renderer.game_state.current_state == GameStateMachine.State.ROM_SETUP, "Renderer must track ROM_SETUP state")
+
+	renderer.free()
+	fsm.free()

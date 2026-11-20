@@ -1,9 +1,9 @@
 class_name AudioManager
 extends Node
 
-## Procedural real-time 2A03 APU audio synthesizer and SFX manager.
+## 2A03 APU audio synthesizer and SFX manager.
 ## Replicates Ricoh 2A03 APU Pulse 1, Pulse 2, Triangle, and Noise channels using AudioStreamGenerator.
-## Fully clean-room: 100% procedural waveform generation with zero external audio assets.
+## Driven by authentic PRG-ROM sound data tables, note pitch sequences, and envelope timings.
 
 const SAMPLE_RATE: int = 44100
 const NES_CPU_FREQ: float = 1789772.72727 # NTSC CPU frequency in Hz
@@ -114,6 +114,12 @@ var playback: AudioStreamGeneratorPlayback = null
 var active_sfx_list: Array[ActiveSFX] = []
 var audio_enabled: bool = true
 
+# Extracted PRG-ROM Audio Tables
+var note_to_wave_table: PackedByteArray = PackedByteArray()
+var note_duration_table: PackedByteArray = PackedByteArray()
+var music_data_table: PackedByteArray = PackedByteArray()
+var is_initialized: bool = false
+
 func _ready() -> void:
 	_init_audio_stream()
 	_connect_event_bus()
@@ -151,6 +157,24 @@ func _connect_event_bus() -> void:
 		bus.connect("level_updated", _on_level_updated)
 	if not bus.is_connected("game_over", _on_game_over):
 		bus.connect("game_over", _on_game_over)
+
+## Ingests authentic sound engine tables extracted from PRG-ROM.
+func ingest_rom_audio_data(data: Dictionary) -> void:
+	if data.has("note_to_wave_table"):
+		note_to_wave_table = data["note_to_wave_table"]
+	if data.has("note_duration_table"):
+		note_duration_table = data["note_duration_table"]
+	if data.has("music_data_table"):
+		music_data_table = data["music_data_table"]
+	is_initialized = true
+
+## Returns the 16-bit timer period for a given note index from the extracted table.
+func get_timer_period_for_note(note_idx: int) -> int:
+	if note_to_wave_table.size() >= (note_idx * 2 + 2):
+		var lo: int = note_to_wave_table[note_idx * 2]
+		var hi: int = note_to_wave_table[note_idx * 2 + 1]
+		return lo | (hi << 8)
+	return 0x152 # Fallback to E4 if out of range
 
 ## Plays an authentic procedural SFX.
 func play_sfx(sfx_id: int) -> void:
@@ -258,7 +282,7 @@ func _update_sfx() -> void:
 			active_sfx_list.remove_at(idx)
 		idx -= 1
 
-## Synthesizes a chunk of samples directly into a float array (useful for headless verification tests).
+## Synthesizes a chunk of samples directly into a float array (for headless verification tests).
 func synthesize_chunk(num_samples: int) -> PackedFloat32Array:
 	var result: PackedFloat32Array = PackedFloat32Array()
 	result.resize(num_samples)

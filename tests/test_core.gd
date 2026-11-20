@@ -21,8 +21,8 @@ static func run_all_tests() -> bool:
 	test_constants_palettes()
 	test_event_bus_signals()
 	test_content_registry_matrices_and_offsets()
-	test_content_registry_procedural_tiles()
-	test_content_registry_tile_atlas()
+	test_content_registry_mandatory_rom_ingestion()
+	test_content_registry_tile_atlas_and_tables()
 
 	print("==================================================")
 	print("  ALL MILESTONE 1 TESTS PASSED SUCCESSFULLY! (10/10)")
@@ -223,49 +223,75 @@ static func test_content_registry_matrices_and_offsets() -> void:
 	reg.free()
 	print("  -> PASSED")
 
-static func test_content_registry_procedural_tiles() -> void:
-	print("[9/10] Testing Procedural 8x8 Tile Generation...")
+static func test_content_registry_mandatory_rom_ingestion() -> void:
+	print("[9/10] Testing ContentRegistry Mandatory ROM Ingestion...")
 	var reg = ContentRegistryScript.new()
-	var palette: Array[Color] = Constants.get_level_palette(0)
+	assert(not reg.is_ready(), "ContentRegistry must start uninitialized (zero procedural fallbacks)")
 
-	# Generate all tile types
-	for t in range(4):
-		var img: Image = reg.generate_procedural_tile_image(t, palette)
-		assert(img.get_width() == 8, "Tile width must be 8")
-		assert(img.get_height() == 8, "Tile height must be 8")
-		assert(img.get_format() == Image.FORMAT_RGBA8, "Image format must be RGBA8")
+	# Verify uninitialized access returns empty tile texture
+	var tex_empty: ImageTexture = reg.get_tile_texture(Constants.TileType.PRIMARY, 0)
+	assert(tex_empty != null, "Empty tile texture should be returned when uninitialized")
 
-		if t == Constants.TileType.EMPTY:
-			assert(img.get_pixel(0, 0).a == 0.0, "Empty tile must be transparent")
-		else:
-			# Tile border/shadow check at (7, 7) should be black
-			assert(img.get_pixel(7, 7) == Color(0, 0, 0, 1.0), "Tile (7,7) must be black shadow")
-			# Specular highlight check at (0, 0) should be White
-			assert(img.get_pixel(0, 0) == palette[2], "Tile (0,0) must be white highlight")
+	# Mock extracted ROM data
+	var mock_img: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	mock_img.fill(Color("#0058F8"))
+	var mock_tex: ImageTexture = ImageTexture.create_from_image(mock_img)
 
-	# Test tile texture retrieval and caching
-	var tex1: ImageTexture = reg.get_tile_texture(Constants.TileType.PRIMARY, 0)
-	var tex2: ImageTexture = reg.get_tile_texture(Constants.TileType.PRIMARY, 0)
-	assert(tex1 != null and tex2 != null, "Texture must not be null")
-	assert(tex1 == tex2, "Texture retrieval must be cached")
-	assert(tex1.get_size() == Vector2(8, 8), "Texture size must be 8x8")
+	var mock_data: Dictionary = {
+		"success": true,
+		"gravity_table": [48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+		"points_table": [0, 40, 100, 300, 1200],
+		"color_table": [[0x0F, 0x30, 0x21, 0x12]],
+		"spawn_orientations": [Constants.Orientation.T_DOWN, Constants.Orientation.J_DOWN, Constants.Orientation.Z_HORIZ, Constants.Orientation.O_FIXED, Constants.Orientation.S_HORIZ, Constants.Orientation.L_DOWN, Constants.Orientation.I_HORIZ],
+		"level_textures": [{
+			"tile_1": mock_tex,
+			"tile_2": mock_tex,
+			"tile_3": mock_tex,
+		}]
+	}
+
+	var ok: bool = reg.ingest_rom_data(mock_data)
+	assert(ok, "Ingest ROM data must succeed")
+	assert(reg.is_ready(), "ContentRegistry must be ready after ROM ingestion")
+
+	var tex_pri: ImageTexture = reg.get_tile_texture(Constants.TileType.PRIMARY, 0)
+	assert(tex_pri == mock_tex, "Tile texture must match ingested ROM texture")
 
 	reg.free()
 	print("  -> PASSED")
 
-static func test_content_registry_tile_atlas() -> void:
-	print("[10/10] Testing Tile Atlas Generation and Caching...")
+static func test_content_registry_tile_atlas_and_tables() -> void:
+	print("[10/10] Testing Ingested Tile Atlas and ROM Tables...")
 	var reg = ContentRegistryScript.new()
-	var atlas1: ImageTexture = reg.get_level_tile_atlas(0)
-	var atlas2: ImageTexture = reg.get_level_tile_atlas(0)
 
-	assert(atlas1 != null and atlas2 != null, "Atlas texture must not be null")
-	assert(atlas1 == atlas2, "Atlas texture must be cached")
-	assert(atlas1.get_size() == Vector2(32, 8), "Atlas texture size must be 32x8 (4 tiles x 8px)")
+	var mock_img: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	mock_img.fill(Color("#00A800"))
+	var mock_tex: ImageTexture = ImageTexture.create_from_image(mock_img)
 
-	var atlas_l1: ImageTexture = reg.get_level_tile_atlas(1)
-	assert(atlas_l1 != null, "Level 1 atlas must not be null")
-	assert(atlas_l1 != atlas1, "Different levels must have distinct atlas textures")
+	var mock_data: Dictionary = {
+		"success": true,
+		"gravity_table": [48, 43, 38, 33, 28, 23, 18, 13, 8, 6, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
+		"points_table": [0, 40, 100, 300, 1200],
+		"color_table": [[0x0F, 0x30, 0x29, 0x1A]],
+		"spawn_orientations": [Constants.Orientation.T_DOWN, Constants.Orientation.J_DOWN, Constants.Orientation.Z_HORIZ, Constants.Orientation.O_FIXED, Constants.Orientation.S_HORIZ, Constants.Orientation.L_DOWN, Constants.Orientation.I_HORIZ],
+		"level_textures": [{
+			"tile_1": mock_tex,
+			"tile_2": mock_tex,
+			"tile_3": mock_tex,
+		}]
+	}
+	reg.ingest_rom_data(mock_data)
+
+	var atlas: ImageTexture = reg.get_level_tile_atlas(0)
+	assert(atlas != null, "Atlas texture must not be null")
+	assert(atlas.get_size() == Vector2(32, 8), "Atlas texture size must be 32x8")
+
+	# Test table lookups
+	assert(reg.get_gravity_frames(0) == 48, "Level 0 gravity must be 48 frames")
+	assert(reg.get_gravity_frames(29) == 1, "Level 29 gravity must be 1 frame")
+	assert(reg.get_score_points(1) == 40, "1 line clear must be 40 points")
+	assert(reg.get_score_points(4) == 1200, "4 lines clear must be 1200 points")
 
 	reg.free()
 	print("  -> PASSED")
+

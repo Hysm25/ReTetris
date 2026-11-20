@@ -9,6 +9,7 @@ const Constants = preload("res://src/core/constants.gd")
 const GameStateMachine = preload("res://src/game/game_state_machine.gd")
 const PlayfieldRenderer = preload("res://src/game/playfield_renderer.gd")
 const AudioManager = preload("res://src/audio/audio_manager.gd")
+const CHRExtractor = preload("res://src/importer/chr_extractor.gd")
 
 var game_state: GameStateMachine = null
 var renderer: PlayfieldRenderer = null
@@ -27,10 +28,20 @@ func _ready() -> void:
 	renderer.name = "PlayfieldRenderer"
 	add_child(renderer)
 
-	# 3. Instantiate Procedural APU Audio Manager
+	# 3. Instantiate APU Audio Manager
 	audio_manager = AudioManager.new()
 	audio_manager.name = "AudioManager"
 	add_child(audio_manager)
+
+	# 4. Mandatory ROM Ingestion Startup Gate
+	var extraction_res: Dictionary = CHRExtractor.auto_ingest_rom()
+	if extraction_res.get("success", false):
+		CHRExtractor.apply_to_registry_and_audio(extraction_res, get_node_or_null("/root/ContentRegistry"), audio_manager)
+		game_state.start_game(0)
+	else:
+		# Refuse to start gameplay: transition to ROM_SETUP state and display missing ROM prompt
+		game_state.current_state = GameStateMachine.State.ROM_SETUP
+		renderer.queue_redraw()
 
 func _physics_process(_delta: float) -> void:
 	if game_state == null:

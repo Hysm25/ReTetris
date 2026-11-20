@@ -18,6 +18,7 @@ enum State {
 	LINE_CLEAR_ANIM = 2,
 	ARE_DELAY = 3,
 	GAME_OVER = 4,
+	ROM_SETUP = 5,
 }
 
 var current_state: State = State.SPAWNING
@@ -86,6 +87,8 @@ func step_frame(held_buttons: int, newly_pressed_buttons: int) -> void:
 			next_piece_type = randomizer.roll_next_piece()
 			_spawn_piece(p_type)
 		State.GAME_OVER:
+			pass
+		State.ROM_SETUP:
 			pass
 
 func _process_active_play(held_buttons: int, newly_pressed_buttons: int) -> void:
