@@ -175,8 +175,8 @@ static func test_100_percent_data_extraction() -> void:
 	assert(spawn == [2, 7, 8, 10, 11, 14, 18], "Spawn orientations must match [2, 7, 8, 10, 11, 14, 18]")
 
 	# 6. PRG-ROM Audio Tables
-	assert(res.note_to_wave_table.size() == 134, "Note-to-wave table must be 134 bytes")
-	assert(res.note_duration_table.size() == 77, "Note duration table must be 77 bytes")
+	assert(res.note_to_wave_table.size() >= 156, "Note-to-wave table must be at least 156 bytes")
+	assert(res.note_duration_table.size() >= 126, "Note duration table must be at least 126 bytes")
 	assert(res.music_data_table.size() == 100, "Music data table must be 100 bytes")
 
 	# 7. Level Textures

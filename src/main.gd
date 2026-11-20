@@ -11,11 +11,13 @@ const PlayfieldRenderer = preload("res://src/game/playfield_renderer.gd")
 const AudioManager = preload("res://src/audio/audio_manager.gd")
 const CHRExtractor = preload("res://src/importer/chr_extractor.gd")
 const MenuController = preload("res://src/game/menu_controller.gd")
+const DemoController = preload("res://src/game/demo_controller.gd")
 
 var game_state: GameStateMachine = null
 var menu_ctrl: MenuController = null
 var renderer: PlayfieldRenderer = null
 var audio_manager: AudioManager = null
+var demo_ctrl: DemoController = null
 
 var prev_held_buttons: int = 0
 
@@ -26,11 +28,14 @@ func _ready() -> void:
 	game_state.is_headless_testing = true
 	add_child(game_state)
 
-	# 2. Instantiate Menu Controller
+	# 2. Instantiate Menu Controller & Demo Controller
 	menu_ctrl = MenuController.new()
 	menu_ctrl.game_started.connect(_on_game_started)
 	menu_ctrl.sfx_requested.connect(_on_menu_sfx)
 	menu_ctrl.music_changed.connect(_on_menu_music)
+	menu_ctrl.demo_started.connect(_on_demo_started)
+
+	demo_ctrl = DemoController.new()
 
 	# 3. Instantiate APU Audio Manager
 	audio_manager = AudioManager.new()
@@ -50,6 +55,9 @@ func _ready() -> void:
 	var extraction_res: Dictionary = CHRExtractor.auto_ingest_rom()
 	if extraction_res.get("success", false):
 		CHRExtractor.apply_to_registry_and_audio(extraction_res, get_node_or_null("/root/ContentRegistry"), audio_manager)
+		var reg: Node = get_node_or_null("/root/ContentRegistry")
+		if reg != null:
+			demo_ctrl.setup(reg.get_demo_buttons_table(), reg.get_demo_tetrimino_type_table())
 		menu_ctrl.reset_to_title()
 	else:
 		# Refuse to start: transition to ROM_SETUP state and display missing ROM prompt
@@ -65,8 +73,16 @@ func _physics_process(_delta: float) -> void:
 	var newly_pressed: int = held_buttons & (~prev_held_buttons)
 	prev_held_buttons = held_buttons
 
-	# Dispatch to MenuController or GameStateMachine based on active mode
-	if menu_ctrl != null and menu_ctrl.current_mode != Constants.MenuMode.IN_GAME:
+	# Dispatch to MenuController, DemoController, or GameStateMachine based on active mode
+	if menu_ctrl != null and menu_ctrl.current_mode == Constants.MenuMode.DEMO:
+		var demo_in: Dictionary = demo_ctrl.step_frame(newly_pressed)
+		if demo_in.get("should_exit", false) or game_state.current_state == GameStateMachine.State.GAME_OVER:
+			demo_ctrl.stop_demo()
+			menu_ctrl.reset_to_title()
+			game_state.current_state = GameStateMachine.State.ACTIVE_PLAY
+		else:
+			game_state.step_frame(demo_in["held"], demo_in["newly"])
+	elif menu_ctrl != null and menu_ctrl.current_mode != Constants.MenuMode.IN_GAME:
 		menu_ctrl.step_frame(held_buttons, newly_pressed)
 	else:
 		game_state.step_frame(held_buttons, newly_pressed)
@@ -75,6 +91,12 @@ func _on_game_started(g_type: int, start_level: int, start_height: int, m_type: 
 	game_state.start_game(start_level, g_type, start_height)
 	if audio_manager != null:
 		audio_manager.set_music_track(m_type)
+
+func _on_demo_started() -> void:
+	demo_ctrl.start_demo()
+	game_state.start_game(0, Constants.GameType.TYPE_A, 0, -1, true)
+	if audio_manager != null:
+		audio_manager.set_music_track(Constants.MusicType.OFF)
 
 func _on_menu_sfx(sfx_id: int) -> void:
 	if audio_manager != null:

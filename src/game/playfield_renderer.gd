@@ -40,6 +40,40 @@ const COLOR_TEXT_RED: Color = Color("#FE8176")
 # Font cache (built-in fallback system font)
 var _hud_font: Font = null
 
+# Optional low-overhead CRT scanline overlay
+var enable_crt_shader: bool = false
+var crt_overlay: CanvasLayer = null
+var crt_rect: ColorRect = null
+
+func set_crt_shader(enabled: bool) -> void:
+	enable_crt_shader = enabled
+	_update_crt_overlay()
+
+func toggle_crt_shader() -> void:
+	enable_crt_shader = not enable_crt_shader
+	_update_crt_overlay()
+
+func _update_crt_overlay() -> void:
+	if not is_inside_tree():
+		return
+	if enable_crt_shader:
+		if crt_overlay == null:
+			crt_overlay = CanvasLayer.new()
+			crt_overlay.name = "CRTOverlay"
+			crt_rect = ColorRect.new()
+			crt_rect.name = "CRTRect"
+			crt_rect.size = Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT)
+			crt_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var mat = ShaderMaterial.new()
+			mat.shader = load("res://src/shaders/crt_scanlines.gdshader")
+			crt_rect.material = mat
+			crt_overlay.add_child(crt_rect)
+			add_child(crt_overlay)
+		crt_overlay.visible = true
+	else:
+		if crt_overlay != null:
+			crt_overlay.visible = false
+
 func _init(p_game_state: GameStateMachine = null, p_menu_ctrl: RefCounted = null) -> void:
 	game_state = p_game_state
 	menu_ctrl = p_menu_ctrl
@@ -95,7 +129,7 @@ func _draw() -> void:
 		_draw_rom_setup_screen()
 		return
 
-	if menu_ctrl != null and menu_ctrl.get("current_mode") != Constants.MenuMode.IN_GAME:
+	if menu_ctrl != null and menu_ctrl.get("current_mode") != Constants.MenuMode.IN_GAME and menu_ctrl.get("current_mode") != Constants.MenuMode.DEMO:
 		var mode: int = menu_ctrl.get("current_mode")
 		match mode:
 			Constants.MenuMode.TITLE_SCREEN:

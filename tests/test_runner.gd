@@ -16,6 +16,7 @@ const TestAudio = preload("res://tests/test_audio.gd")
 const TestImporter = preload("res://tests/test_importer.gd")
 const TestMenu = preload("res://tests/test_menu.gd")
 const TestHighScores = preload("res://tests/test_high_scores.gd")
+const TestMusicEngine = preload("res://tests/test_music_engine.gd")
 
 func _init() -> void:
 	print("==================================================")
@@ -50,9 +51,13 @@ func _init() -> void:
 	print("\n>>> Running Phase 3: High Score System & Polish Tests <<<")
 	TestHighScores.run_all_tests()
 
+	# 6. Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback
+	print("\n>>> Running Phase 4: APU Music Bytecode & Demo Tests <<<")
+	success = TestMusicEngine.run_all_tests() and success
+
 	print("\n==================================================")
 	if success:
-		print(">>> ALL TEST SUITES PASSED CLEANLY! (12/12 Suites) <<<")
+		print(">>> ALL TEST SUITES PASSED CLEANLY! (13/13 Suites) <<<")
 		print("==================================================")
 		quit(0)
 	else:

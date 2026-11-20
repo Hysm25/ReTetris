@@ -13,6 +13,7 @@ signal mode_changed(new_mode: int)
 signal game_started(game_type: int, start_level: int, start_height: int, music_type: int)
 signal sfx_requested(sfx_id: int)
 signal music_changed(track_type: int)
+signal demo_started()
 
 var current_mode: int = Constants.MenuMode.TITLE_SCREEN
 var game_type: int = Constants.GameType.TYPE_A
@@ -59,6 +60,8 @@ func step_frame(held_buttons: int, newly_pressed_buttons: int) -> void:
 			_step_high_score_entry(held_buttons, newly_pressed_buttons)
 		Constants.MenuMode.HIGH_SCORE_TABLE:
 			_step_high_score_table(held_buttons, newly_pressed_buttons)
+		Constants.MenuMode.DEMO:
+			_step_demo(held_buttons, newly_pressed_buttons)
 		Constants.MenuMode.IN_GAME:
 			pass
 
@@ -69,6 +72,15 @@ func _step_title_screen(_held_buttons: int, newly_pressed: int) -> void:
 		current_mode = Constants.MenuMode.GAME_TYPE_MENU
 		mode_changed.emit(current_mode)
 		music_changed.emit(music_type)
+	elif title_timer >= Constants.TITLE_DEMO_TIMEOUT_FRAMES:
+		# Title screen timed out without player input -> Enter attract demo mode
+		current_mode = Constants.MenuMode.DEMO
+		mode_changed.emit(current_mode)
+		demo_started.emit()
+
+func _step_demo(_held_buttons: int, newly_pressed: int) -> void:
+	if (newly_pressed & Constants.BUTTON_START) != 0:
+		reset_to_title()
 
 func _step_game_type_menu(_held_buttons: int, newly_pressed: int) -> void:
 	if (newly_pressed & Constants.BUTTON_LEFT) != 0:

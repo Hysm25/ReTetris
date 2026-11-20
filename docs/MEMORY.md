@@ -126,4 +126,10 @@ updated: 2026-11-20
     - Extracted ending screen nametable (`0x004E17`) and ending palette (`0x002D53`).
     - Implemented 5 authentic score tiers for Type A (30k small, 50k medium-small, 70k medium, 100k large, 120k Saint Basil's cathedral), 240-frame launchpad hold, liftoff climb, and animated thruster flames.
   - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **12/12 test suites passing cleanly** (including `tests/test_high_scores.gd`).
-  - **Next Target Milestone**: Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback.
+- **Phase 4 Completion (Full 2A03 APU Music Bytecode Engine & Demo Playback)**:
+  - **Multi-Channel 2A03 APU Bytecode Player**: Implemented `src/audio/music_bytecode_player.gd` interpreting authentic PRG-ROM sound routines and volume envelopes at 60 TPS across Pulse 1, Pulse 2, Triangle, and Noise channels.
+  - **10 Authentic Tracks**: Full bytecode support for Track 0 (Title), Track 1 (B-Type Goal), Track 2 (Music 1 Korobeiniki), Track 3 (Music 2 Troika), Track 4 (Music 3 Kalinka), fast tempo tracks 5-7, Track 8 (Congratulations), and Track 9 (Ending Rocket theme).
+  - **Attract-Mode Demo Playback**: Implemented `src/game/demo_controller.gd` feeding recorded inputs from PRG-ROM offset `0x005D10` (CPU `$DD00`, 512 bytes) and authentic piece generation from `0x005F10` (CPU `$DF00`, 256 bytes) after 1280 frames of idle time on the title screen, with immediate Start-button exit.
+  - **Retro CRT Scanline Shader**: Added lightweight CanvasItem shader `src/shaders/crt_scanlines.gdshader` with runtime toggle support in `PlayfieldRenderer`.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **13/13 test suites passing cleanly** (including `tests/test_music_engine.gd`).
+  - **Next Target Milestone**: Standalone desktop and mobile packaging / input customization.

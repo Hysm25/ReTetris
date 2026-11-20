@@ -62,16 +62,33 @@ func _ready() -> void:
 	if not is_headless_testing:
 		start_game(0)
 
-func start_game(starting_level: int, game_type: int = Constants.GameType.TYPE_A, starting_height: int = 0, seed_val: int = -1) -> void:
+func start_game(starting_level: int, game_type_or_seed: int = Constants.GameType.TYPE_A, starting_height: int = 0, seed_val: int = -1, is_demo: bool = false) -> void:
+	var g_type: int = Constants.GameType.TYPE_A
+	var s_val: int = seed_val
+	if game_type_or_seed > 1:
+		s_val = game_type_or_seed
+		g_type = Constants.GameType.TYPE_A
+	else:
+		g_type = game_type_or_seed
+
 	grid.clear()
 	das.reset()
 	piece.reset()
-	randomizer.reset(seed_val)
-	current_game_type = game_type
-	score_mgr.init_game(starting_level, game_type, starting_height)
+	randomizer.reset(s_val)
+	if is_demo:
+		var main_loop: MainLoop = Engine.get_main_loop()
+		var reg: Node = null
+		if main_loop is SceneTree and (main_loop as SceneTree).root != null:
+			reg = (main_loop as SceneTree).root.get_node_or_null("/root/ContentRegistry")
+		var types: PackedByteArray = reg.get_demo_tetrimino_type_table() if reg != null else PackedByteArray()
+		randomizer.set_demo_mode(true, types)
+	else:
+		randomizer.set_demo_mode(false)
+	current_game_type = g_type
+	score_mgr.init_game(starting_level, g_type, starting_height)
 
-	if game_type == Constants.GameType.TYPE_B:
-		grid.setup_type_b_garbage(starting_height, seed_val)
+	if g_type == Constants.GameType.TYPE_B:
+		grid.setup_type_b_garbage(starting_height, s_val)
 
 	# Initial roll for active and next piece
 	var first_piece: int = randomizer.roll_next_piece()

@@ -28,9 +28,13 @@ const GRAVITY_TABLE_ROM_OFFSET: int = 0x00099E   # CPU $898E (30 bytes: levels 0
 const POINTS_TABLE_ROM_OFFSET: int = 0x001CB5    # CPU $9CA5 (10 bytes: 5 16-bit words)
 const SPAWN_TABLE_ROM_OFFSET: int = 0x001966     # CPU $9956 (19 bytes: orientation to spawn orientation)
 const SPAWN_ORIENTATIONS_OFFSET: int = 0x00195E # CPU $994E (7 bytes: piece spawn orientations)
-const NOTE_TO_WAVE_ROM_OFFSET: int = 0x004655    # CPU $C645 (134 bytes: pitch period table)
-const NOTE_DURATION_ROM_OFFSET: int = 0x0046FB   # CPU $C6EB (77 bytes: note duration table)
-const MUSIC_DATA_TABLE_ROM_OFFSET: int = 0x004747# CPU $C737 (100 bytes: music track table)
+const NOTE_TO_WAVE_ROM_OFFSET: int = 0x006B23    # CPU $EB13 (156 bytes: 78 pitch period words)
+const NOTE_DURATION_ROM_OFFSET: int = 0x006BBF   # CPU $EBAF (126 bytes: note duration table)
+const MUSIC_DATA_TABLE_ROM_OFFSET: int = 0x006C3D# CPU $EC2D (100 bytes: 10 track headers * 10 bytes)
+const MUSIC_VOL_TABLE_ROM_OFFSET: int = 0x006A5A # CPU $EA4A (44 bytes: 22 16-bit envelope pointers)
+const NOISES_TABLE_ROM_OFFSET: int = 0x0065BB    # CPU $E5AB (37 bytes: noise triples)
+const DEMO_BUTTONS_ROM_OFFSET: int = 0x005D10    # CPU $DD00 (512 bytes: input recording)
+const DEMO_TETRIMINO_TYPE_ROM_OFFSET: int = 0x005F10 # CPU $DF00 (256 bytes: piece types)
 const MENU_PALETTE_ROM_OFFSET: int = 0x002D3B       # CPU $9731 (20 bytes + header)
 const TITLE_NAMETABLE_ROM_OFFSET: int = 0x003229     # CPU $B219 (title screen compressed stream)
 const GAME_TYPE_NAMETABLE_ROM_OFFSET: int = 0x00368A  # CPU $B67A (game type menu compressed stream)
@@ -317,6 +321,7 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	var prg_chunks: int = rom_bytes[4]
 	var prg_bytes_size: int = prg_chunks * PRG_BANK_SIZE
 	var chr_offset: int = INES_HEADER_SIZE + prg_bytes_size
+	var prg_bytes: PackedByteArray = rom_bytes.slice(INES_HEADER_SIZE, chr_offset)
 
 	# 2. Extract 16KB CHR-ROM across all 4 banks
 	var chr_data: PackedByteArray = rom_bytes.slice(chr_offset, chr_offset + TOTAL_CHR_SIZE)
@@ -364,10 +369,15 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 		spawn_orientations.append(rom_bytes[SPAWN_ORIENTATIONS_OFFSET + i])
 	result["spawn_orientations"] = spawn_orientations
 
-	# 7. Extract PRG-ROM Audio Tables (CPU $C645, $C6EB, $C737)
-	result["note_to_wave_table"] = rom_bytes.slice(NOTE_TO_WAVE_ROM_OFFSET, NOTE_TO_WAVE_ROM_OFFSET + 134)
-	result["note_duration_table"] = rom_bytes.slice(NOTE_DURATION_ROM_OFFSET, NOTE_DURATION_ROM_OFFSET + 77)
+	# 7. Extract PRG-ROM Audio Tables and Sound Bank
+	result["prg_rom"] = prg_bytes
+	result["note_to_wave_table"] = rom_bytes.slice(NOTE_TO_WAVE_ROM_OFFSET, NOTE_TO_WAVE_ROM_OFFSET + 156)
+	result["note_duration_table"] = rom_bytes.slice(NOTE_DURATION_ROM_OFFSET, NOTE_DURATION_ROM_OFFSET + 126)
 	result["music_data_table"] = rom_bytes.slice(MUSIC_DATA_TABLE_ROM_OFFSET, MUSIC_DATA_TABLE_ROM_OFFSET + 100)
+	result["music_vol_table"] = rom_bytes.slice(MUSIC_VOL_TABLE_ROM_OFFSET, MUSIC_VOL_TABLE_ROM_OFFSET + 44)
+	result["noises_table"] = rom_bytes.slice(NOISES_TABLE_ROM_OFFSET, NOISES_TABLE_ROM_OFFSET + 37)
+	result["demo_buttons_table"] = rom_bytes.slice(DEMO_BUTTONS_ROM_OFFSET, DEMO_BUTTONS_ROM_OFFSET + 512)
+	result["demo_tetrimino_type_table"] = rom_bytes.slice(DEMO_TETRIMINO_TYPE_ROM_OFFSET, DEMO_TETRIMINO_TYPE_ROM_OFFSET + 256)
 
 	# 8. Generate Level Textures for all 10 cycling levels (Bank 3)
 	var level_textures: Array[Dictionary] = []

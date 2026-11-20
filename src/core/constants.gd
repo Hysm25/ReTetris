@@ -76,6 +76,25 @@ enum MenuMode {
 	HIGH_SCORE_ENTRY = 5,
 	HIGH_SCORE_TABLE = 6,
 	ENDING_ANIMATION = 7,
+	DEMO = 8,
+}
+
+# Attract-Mode Demo Constants (1280 frames ~21.3s title screen timeout)
+const TITLE_DEMO_TIMEOUT_FRAMES: int = 1280
+
+# Authentic 2A03 PRG-ROM Music Track IDs
+enum MusicTrack {
+	TITLE_SCREEN = 0,
+	B_TYPE_GOAL = 1,
+	MUSIC_1 = 2,           # Korobeiniki
+	MUSIC_2 = 3,           # Troika
+	MUSIC_3 = 4,           # Kalinka
+	MUSIC_1_FAST = 5,
+	MUSIC_2_FAST = 6,
+	MUSIC_3_FAST = 7,
+	CONGRATULATIONS = 8,
+	ENDING_ROCKET = 9,
+	OFF = -1,
 }
 
 # Topout Curtain Wipe Constants (64-frame initial delay, 20 visible rows, 4 frames per row)

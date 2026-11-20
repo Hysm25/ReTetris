@@ -74,6 +74,16 @@ var extracted_points_table: Array[int] = []
 var extracted_color_table: Array[Array] = []
 var extracted_spawn_orientations: Array[int] = []
 
+# Extracted PRG-ROM Audio & Demo Tables
+var prg_rom: PackedByteArray = PackedByteArray()
+var demo_buttons_table: PackedByteArray = PackedByteArray()
+var demo_tetrimino_type_table: PackedByteArray = PackedByteArray()
+var note_to_wave_table: PackedByteArray = PackedByteArray()
+var note_duration_table: PackedByteArray = PackedByteArray()
+var music_data_table: PackedByteArray = PackedByteArray()
+var music_vol_table: PackedByteArray = PackedByteArray()
+var noises_table: PackedByteArray = PackedByteArray()
+
 # Extracted Authentic Menu Textures (256x240)
 var title_screen_texture: ImageTexture = null
 var game_type_menu_texture: ImageTexture = null
@@ -249,6 +259,24 @@ func ingest_rom_data(extracted_data: Dictionary) -> bool:
 	if extracted_data.has("default_high_scores"):
 		default_high_scores = extracted_data["default_high_scores"] as Dictionary
 
+	# 4. Ingest Authentic Audio & Demo Bytecode Tables
+	if extracted_data.has("prg_rom"):
+		prg_rom = extracted_data["prg_rom"]
+	if extracted_data.has("demo_buttons_table"):
+		demo_buttons_table = extracted_data["demo_buttons_table"]
+	if extracted_data.has("demo_tetrimino_type_table"):
+		demo_tetrimino_type_table = extracted_data["demo_tetrimino_type_table"]
+	if extracted_data.has("note_to_wave_table"):
+		note_to_wave_table = extracted_data["note_to_wave_table"]
+	if extracted_data.has("note_duration_table"):
+		note_duration_table = extracted_data["note_duration_table"]
+	if extracted_data.has("music_data_table"):
+		music_data_table = extracted_data["music_data_table"]
+	if extracted_data.has("music_vol_table"):
+		music_vol_table = extracted_data["music_vol_table"]
+	if extracted_data.has("noises_table"):
+		noises_table = extracted_data["noises_table"]
+
 	is_initialized = true
 	return true
 
@@ -323,6 +351,30 @@ func get_type_a_ending_texture() -> ImageTexture:
 
 func get_default_high_scores() -> Dictionary:
 	return default_high_scores
+
+func get_prg_rom() -> PackedByteArray:
+	return prg_rom
+
+func get_demo_buttons_table() -> PackedByteArray:
+	return demo_buttons_table
+
+func get_demo_tetrimino_type_table() -> PackedByteArray:
+	return demo_tetrimino_type_table
+
+func get_note_to_wave_table() -> PackedByteArray:
+	return note_to_wave_table
+
+func get_note_duration_table() -> PackedByteArray:
+	return note_duration_table
+
+func get_music_data_table() -> PackedByteArray:
+	return music_data_table
+
+func get_music_vol_table() -> PackedByteArray:
+	return music_vol_table
+
+func get_noises_table() -> PackedByteArray:
+	return noises_table
 
 ## Clears custom textures.
 func reset_custom_textures() -> void:

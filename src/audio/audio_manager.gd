@@ -8,6 +8,9 @@ extends Node
 const SAMPLE_RATE: int = 44100
 const NES_CPU_FREQ: float = 1789772.72727 # NTSC CPU frequency in Hz
 
+const MusicBytecodePlayer = preload("res://src/audio/music_bytecode_player.gd")
+const Constants = preload("res://src/core/constants.gd")
+
 # --- 2A03 APU Channel Simulators ---
 
 class PulseChannel:
@@ -122,6 +125,7 @@ var audio_enabled: bool = true
 var note_to_wave_table: PackedByteArray = PackedByteArray()
 var note_duration_table: PackedByteArray = PackedByteArray()
 var music_data_table: PackedByteArray = PackedByteArray()
+var music_player: MusicBytecodePlayer = MusicBytecodePlayer.new()
 var is_initialized: bool = false
 
 func _ready() -> void:
@@ -172,6 +176,11 @@ func ingest_rom_audio_data(data: Dictionary) -> void:
 		note_duration_table = data["note_duration_table"]
 	if data.has("music_data_table"):
 		music_data_table = data["music_data_table"]
+
+	var prg: PackedByteArray = data.get("prg_rom", PackedByteArray())
+	var vol: PackedByteArray = data.get("music_vol_table", PackedByteArray())
+	var noises: PackedByteArray = data.get("noises_table", PackedByteArray())
+	music_player.setup_tables(prg, note_to_wave_table, note_duration_table, music_data_table, vol, noises)
 	is_initialized = true
 
 ## Returns the 16-bit timer period for a given note index from the extracted table.
@@ -231,8 +240,13 @@ func play_sfx(sfx_id: int) -> void:
 
 	active_sfx_list.append(s)
 
+func _physics_process(_delta: float) -> void:
+	if music_player != null:
+		music_player.step_frame()
+
 func _process(_delta: float) -> void:
 	_update_sfx()
+	_apply_channel_states()
 
 	if playback == null:
 		return
@@ -251,6 +265,39 @@ func _process(_delta: float) -> void:
 		mix = clampf(mix, -1.0, 1.0)
 		playback.push_frame(Vector2(mix, mix))
 		frames_to_fill -= 1
+
+func _apply_channel_states() -> void:
+	var sfx_on_sq1: bool = false
+	var sfx_on_noise: bool = false
+	for sfx in active_sfx_list:
+		if sfx.channel == "sq1":
+			sfx_on_sq1 = true
+		elif sfx.channel == "noise":
+			sfx_on_noise = true
+
+	if not sfx_on_sq1:
+		var ch0 = music_player.channels[0]
+		sq1.enabled = ch0.enabled and ch0.volume > 0.0
+		sq1.timer_period = ch0.timer_period
+		sq1.volume = ch0.volume
+		sq1.duty = ch0.duty
+
+	var ch1 = music_player.channels[1]
+	sq2.enabled = ch1.enabled and ch1.volume > 0.0
+	sq2.timer_period = ch1.timer_period
+	sq2.volume = ch1.volume
+	sq2.duty = ch1.duty
+
+	var ch2 = music_player.channels[2]
+	tri.enabled = ch2.enabled and ch2.volume > 0.0
+	tri.timer_period = ch2.timer_period
+	tri.volume = ch2.volume
+
+	if not sfx_on_noise:
+		var ch3 = music_player.channels[3]
+		noise.enabled = ch3.enabled and ch3.volume > 0.0
+		noise.volume = ch3.volume
+		noise.period = ch3.noise_period
 
 ## Advances active SFX animation at 60 Hz simulation tick.
 func _update_sfx() -> void:
@@ -316,6 +363,7 @@ func _update_sfx() -> void:
 
 ## Synthesizes a chunk of samples directly into a float array (for headless verification tests).
 func synthesize_chunk(num_samples: int) -> PackedFloat32Array:
+	_apply_channel_states()
 	var result: PackedFloat32Array = PackedFloat32Array()
 	result.resize(num_samples)
 	var dt: float = 1.0 / float(SAMPLE_RATE)
@@ -339,21 +387,37 @@ func clear_sfx() -> void:
 	sq2.enabled = false
 	tri.enabled = false
 	noise.enabled = false
+	if music_player != null:
+		music_player.stop_music()
 
 var current_music_track: int = 0
 
 ## Sets the current BGM track (0=Music 1/Korobeiniki, 1=Music 2, 2=Music 3, 3=Off).
 func set_music_track(track_type: int) -> void:
 	current_music_track = track_type
-	if track_type == 3: # OFF
-		tri.enabled = false
-		tri.volume = 0.0
-	else:
-		tri.enabled = true
-		tri.volume = 0.4
-		var note_idx: int = 24 + track_type * 4
-		var period: int = get_timer_period_for_note(note_idx)
-		tri.timer_period = period if period > 0 else 0x080
+	match track_type:
+		Constants.MusicType.MUSIC_1:
+			music_player.load_track(Constants.MusicTrack.MUSIC_1)
+		Constants.MusicType.MUSIC_2:
+			music_player.load_track(Constants.MusicTrack.MUSIC_2)
+		Constants.MusicType.MUSIC_3:
+			music_player.load_track(Constants.MusicTrack.MUSIC_3)
+		Constants.MusicType.OFF:
+			music_player.stop_music()
+			tri.enabled = false
+			tri.volume = 0.0
+		_:
+			if track_type >= 0 and track_type < 10:
+				music_player.load_track(track_type)
+			else:
+				music_player.stop_music()
+				tri.enabled = false
+				tri.volume = 0.0
+
+## Plays any authentic 2A03 music track by index (0..9).
+func play_raw_track(track_id: int) -> void:
+	current_music_track = track_id
+	music_player.load_track(track_id)
 
 # --- EventBus Handlers ---
 
