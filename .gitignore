@@ -1,0 +1,35 @@
+# Godot 4+ ignores
+.godot/
+*.translation
+*.uid
+
+# Clean-Room & Legal Asset Boundaries (Strict)
+# Absolutely zero copyrighted Nintendo / BPS ROMs, dumped graphics, or audio in repo
+*.nes
+*.NES
+*.fds
+*.FDS
+*.bin
+*.rom
+*.sav
+nes_data/
+user/
+extracted/
+export/
+
+# Mono / C#
+.mono/
+data_*/
+mono_crash.*.json
+
+# Operating System & Editor Artifacts
+.directory
+.DS_Store
+Thumbs.db
+*.tmp
+*~
+*.swp
+.idea/
+.vscode/
+.obsidian/
+*.orig
