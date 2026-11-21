@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=ReTetris
+GenericName=Block Puzzle Game
+Comment=Clean-room 1989 NES Tetris in Godot 4.3+ (strictly typed GDScript)
+Exec=retetris
+Icon=retetris
+Terminal=false
+Categories=Game;ArcadeGame;BlocksGame;
+Keywords=tetris;nes;retro;puzzle;cleanroom;
+StartupNotify=true
+StartupWMClass=ReTetris

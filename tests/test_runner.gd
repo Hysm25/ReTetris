@@ -17,6 +17,7 @@ const TestImporter = preload("res://tests/test_importer.gd")
 const TestMenu = preload("res://tests/test_menu.gd")
 const TestHighScores = preload("res://tests/test_high_scores.gd")
 const TestMusicEngine = preload("res://tests/test_music_engine.gd")
+const TestInputPackaging = preload("res://tests/test_input_packaging.gd")
 
 func _init() -> void:
 	print("==================================================")
@@ -55,9 +56,13 @@ func _init() -> void:
 	print("\n>>> Running Phase 4: APU Music Bytecode & Demo Tests <<<")
 	success = TestMusicEngine.run_all_tests() and success
 
+	# 7. Phase 5: Controller Remapping, Input Profiles & Packaging
+	print("\n>>> Running Phase 5: Controller Remapping, Profiles & Packaging Tests <<<")
+	success = TestInputPackaging.run_all_tests() and success
+
 	print("\n==================================================")
 	if success:
-		print(">>> ALL TEST SUITES PASSED CLEANLY! (13/13 Suites) <<<")
+		print(">>> ALL TEST SUITES PASSED CLEANLY! (14/14 Suites) <<<")
 		print("==================================================")
 		quit(0)
 	else:

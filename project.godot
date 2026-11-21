@@ -23,6 +23,7 @@ config/features=PackedStringArray("4.7", "GL Compatibility")
 
 EventBus="*res://src/core/event_bus.gd"
 ContentRegistry="*res://src/core/content_registry.gd"
+InputManager="*res://src/core/input_manager.gd"
 
 [display]
 

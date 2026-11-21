@@ -282,6 +282,13 @@ Central repository for authentic ROM tables, tetromino matrices, palettes, and t
 - Stores extracted CHR-ROM pattern sheets: playfield mino blocks, UI frames, borders, and NES font glyphs.
 - Strictly guards against uninitialized access: raises explicit errors if extracted ROM data is not loaded.
 
+#### 3. `InputManager` (`res://src/core/input_manager.gd`)
+Central input controller and remapping manager:
+- Maps 8 authentic NES inputs (`A`, `B`, `Select`, `Start`, `Up`, `Down`, `Left`, `Right`) to Godot `InputMap` actions at 60 TPS.
+- Provides input profiles (`DEFAULT_KEYBOARD`, `WASD_KEYBOARD`, `GAMEPAD_STANDARD`, `CUSTOM`).
+- Implements 3 SOCD cleaning modes (`NEUTRAL`, `LAST_INPUT`, `PRIORITY`).
+- Serializes and loads custom configurations to/from `user://input_config.json`.
+
 ### 4.3 Module Responsibilities
 
 1. **`BoardGrid` (`src/game/board_grid.gd`)**:
@@ -328,11 +335,17 @@ res://
 │   ├── STATUS.md                     # Phase roadmap & verification checklist
 │   ├── USER.md                       # User profile & environment context (Untouched)
 │   └── SOUL.md                       # Assistant persona & execution rules (Untouched)
+├── export_presets.cfg                # Multiplatform export presets (Linux, Windows, Android, Web)
+├── packaging/
+│   └── retetris.desktop              # FreeDesktop application desktop entry
+├── scripts/
+│   └── build_package.sh              # Standalone export & packaging runner
 ├── src/
 │   ├── core/
 │   │   ├── constants.gd              # Game enums, dimensions, timings, and formula specifications
 │   │   ├── event_bus.gd              # Typed global signal dispatcher
-│   │   └── content_registry.gd       # ROM table repository & extracted texture manager
+│   │   ├── content_registry.gd       # ROM table repository & extracted texture manager
+│   │   └── input_manager.gd          # Centralized input manager, profiles & SOCD cleaner
 │   ├── game/
 │   │   ├── board_grid.gd             # 10x22 grid state & collision queries
 │   │   ├── das_handler.gd            # Frame-accurate 16/6 DAS input handler
@@ -340,15 +353,22 @@ res://
 │   │   ├── piece_randomizer.gd       # 1989 two-roll randomizer implementation
 │   │   ├── score_manager.gd          # Authentic scoring & level transitions
 │   │   ├── playfield_renderer.gd     # 256x240 canvas item & CHR-ROM tile renderer
-│   │   └── game_state_machine.gd     # Play, ARE, LineClear, GameOver, and ROM_Setup states
+│   │   ├── game_state_machine.gd     # Play, ARE, LineClear, GameOver, and ROM_Setup states
+│   │   ├── menu_controller.gd        # Authentic Title, Game Type & Level menu state machine
+│   │   ├── high_score_manager.gd     # Persistent Top 3 tables for Game A and Game B
+│   │   ├── demo_controller.gd        # Attract-mode demo recording & piece feeder
+│   │   └── virtual_gamepad.gd        # Mobile touch-screen on-screen virtual NES controller
 │   ├── audio/
-│   │   └── audio_manager.gd          # 2A03 APU synthesizer driven by authentic PRG-ROM sound tables
+│   │   ├── audio_manager.gd          # 2A03 APU synthesizer driven by authentic PRG-ROM sound tables
+│   │   └── music_bytecode_player.gd  # Multi-channel 2A03 APU music bytecode interpreter
 │   ├── importer/
 │   │   └── chr_extractor.gd          # Pure GDScript iNES header & PRG/CHR-ROM extractor
+│   ├── shaders/
+│   │   └── crt_scanlines.gdshader    # Retro CRT scanline and vignette CanvasItem shader
 │   ├── main.gd                       # Root scene coordinator & ROM startup guard
 │   └── main.tscn                     # Root scene entry point
 └── tests/
-    ├── test_runner.gd                # Headless verification harness (10+ test suites)
+    ├── test_runner.gd                # Headless verification harness (14 test suites)
     ├── test_core.gd                  # Verification of core enums, timings, and events
     ├── test_randomizer.gd            # Verification of 1989 two-roll piece distribution
     ├── test_board_grid.gd            # Verification of grid occupancy and line clears
@@ -358,5 +378,9 @@ res://
     ├── test_game_simulation.gd       # Verification of deterministic 60 TPS state transitions
     ├── test_renderer.gd              # Verification of viewport offsets & preview positioning
     ├── test_audio.gd                 # Verification of APU channels & SFX synthesis
-    └── test_importer.gd              # Verification of 2bpp planar decoder & ROM extraction
+    ├── test_importer.gd              # Verification of 2bpp planar decoder & ROM extraction
+    ├── test_menu.gd                  # Verification of menus, nametables & Type B garbage
+    ├── test_high_scores.gd           # Verification of persistence, curtain wipe & rocket endings
+    ├── test_music_engine.gd          # Verification of APU bytecode player, demo & CRT shader
+    └── test_input_packaging.gd       # Verification of InputManager, profiles, SOCD & packaging
 ```

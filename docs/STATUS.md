@@ -1,9 +1,9 @@
 # Project Status (`docs/STATUS.md`)
 
 ## Current Phase
-- **Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback (Completed)**
-  - **Context**: Implemented the complete multi-channel APU music bytecode interpreter for authentic PRG-ROM BGM streams and authentic attract-mode demo sequence.
-  - **Rule**: Zero procedural fallbacks. All audio tables, routines, envelopes, and demo inputs sourced directly from extracted ROM assets in `user://nes_data/`.
+- **Phase 5: Controller Remapping, Input Profiles & Packaging (Completed)**
+  - **Context**: Implemented centralized input management, controller profiles, SOCD cleaning, virtual touch gamepad for mobile, export presets, and standalone packaging tooling.
+  - **Rule**: Strictly typed GDScript, 60 TPS simulation loop, zero copyrighted assets, fully automated headless verification.
   - **Completed Foundation**:
     1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
     2. Gameplay Simulation Components (`piece_randomizer.gd`, `board_grid.gd`, `das_handler.gd`, `piece_controller.gd`, `score_manager.gd`, `game_state_machine.gd`)
@@ -12,6 +12,57 @@
     5. Phase 2: Menu Flow & Game Modes (`menu_controller.gd`, nametable extraction, Type B mode, level 10-19 shortcut)
     6. Phase 3: High Score System & Polish (`high_score_manager.gd`, curtain wipe, rocket endings, high score screens)
     7. Phase 4: Full 2A03 APU Music Bytecode Engine & Demo Playback (`music_bytecode_player.gd`, `demo_controller.gd`, `crt_scanlines.gdshader`)
+    8. Phase 5: Controller Remapping, Input Profiles & Packaging (`input_manager.gd`, `virtual_gamepad.gd`, `export_presets.cfg`, `retetris.desktop`, `build_package.sh`)
+
+---
+
+## Phase 5: Controller Remapping, Input Profiles & Packaging (Completed)
+
+### 1. Centralized Input Management & Controller Remapping (`src/core/input_manager.gd`)
+- [x] Implemented `InputManager` Autoload singleton managing authentic NES controller bitmasks at 60 TPS:
+  - 8 core NES actions: `tetris_left`, `tetris_right`, `tetris_down`, `tetris_up`, `tetris_a`, `tetris_b`, `tetris_start`, `tetris_select`.
+  - Shortcut utility actions: `tetris_toggle_crt` (F1/C), `tetris_reset` (F5/R).
+- [x] Input Profiles:
+  - `DEFAULT_KEYBOARD`: Arrow keys + X/Z/Enter/Space/Shift.
+  - `WASD_KEYBOARD`: WASD + J/K/L/Backspace.
+  - `GAMEPAD_STANDARD`: D-Pad, Left Analog Stick (with configurable deadzone, default 0.3), face buttons A/B/X/Y, Start/Options, Back/Select.
+  - `CUSTOM`: Dynamic user bindings loaded from JSON.
+- [x] SOCD (Simultaneous Opposite Cardinal Direction) Cleaning:
+  - `SOCDMode.NEUTRAL`: Left + Right = 0, Up + Down = 0 (authentic tournament standard).
+  - `SOCDMode.LAST_INPUT`: Tracks newly pressed direction to allow latest direction precedence.
+  - `SOCDMode.PRIORITY`: Left overrides Right, Up overrides Down.
+- [x] Persistence & Remapping API:
+  - `add_key_binding()`, `add_joy_button_binding()`, `add_joy_axis_binding()`, `clear_action_bindings()`.
+  - JSON serialization: `save_profile_to_file("user://input_config.json")`, `load_profile_from_file()`, and corrupt-data recovery.
+
+### 2. Mobile On-Screen Virtual Controller (`src/game/virtual_gamepad.gd`)
+- [x] Implemented `VirtualGamepad` multi-touch CanvasLayer:
+  - Authentic NES layout: 4-way D-Pad (left), round B/A action buttons (right), and Select/Start pill buttons (center).
+  - Multi-touch tracking supporting simultaneous direction holding and piece rotation.
+  - Viewport-to-screen coordinate translation calibrated for 256x240 integer scaling.
+  - Auto-enabled on mobile platforms (`OS.has_feature("mobile")` or Android/iOS), with toggle support.
+
+### 3. Export Presets & Native Desktop Packaging (`export_presets.cfg` & `packaging/`)
+- [x] Configured production-grade `export_presets.cfg` for Godot 4:
+  - Linux/X11 Desktop (x86_64, arm64)
+  - Windows Desktop (x86_64)
+  - Android Mobile (arm64-v8a)
+  - Web (HTML5 WASM)
+  - Clean-room boundary filters: strictly excludes `TetrisNESDisasm/*`, `*.nes`, `*.bin`, `*.asm`, `.git/*`.
+- [x] FreeDesktop launcher: `packaging/retetris.desktop` for EndeavourOS/CachyOS integration.
+- [x] Standalone packaging script: `scripts/build_package.sh` with executable permissions and fish-compatible execution guidelines.
+
+### 4. Automated Headless Verification
+- [x] Created `tests/test_input_packaging.gd` covering 10 comprehensive tests:
+  - InputManager action mappings and default profile setup.
+  - Default keyboard, WASD, and gamepad profiles.
+  - SOCD cleaner across Neutral, Priority, and Last Input modes.
+  - Custom key remapping, dictionary export/import, JSON file roundtrip, and error resilience.
+  - Mock raw mask polling at 60 TPS.
+  - VirtualGamepad touch hit-testing, multitouch tracking, and button bitmask synchronization.
+  - Export presets section and clean-room exclude filter validation.
+  - Desktop entry file and build script metadata verification.
+- [x] Verified full headless test suite: **14/14 test suites passing cleanly** with 100% assertions via `godot --headless -s tests/test_runner.gd`.
 
 ---
 
@@ -259,6 +310,6 @@
 
 ## Future Phases
 
-### Complete Engine Verification & Native Packaging
-- [ ] Export templates and standalone desktop/mobile packaging.
-- [ ] Controller remapping and input profile configuration.
+### Extended Features & Modding
+- [ ] Custom skin / palette modding loader.
+- [ ] Netplay multiplayer / dual-board competition mode.

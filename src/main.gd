@@ -12,12 +12,16 @@ const AudioManager = preload("res://src/audio/audio_manager.gd")
 const CHRExtractor = preload("res://src/importer/chr_extractor.gd")
 const MenuController = preload("res://src/game/menu_controller.gd")
 const DemoController = preload("res://src/game/demo_controller.gd")
+const InputManagerClass = preload("res://src/core/input_manager.gd")
+const VirtualGamepad = preload("res://src/game/virtual_gamepad.gd")
 
 var game_state: GameStateMachine = null
 var menu_ctrl: MenuController = null
 var renderer: PlayfieldRenderer = null
 var audio_manager: AudioManager = null
 var demo_ctrl: DemoController = null
+var input_mgr: Node = null
+var virtual_pad: VirtualGamepad = null
 
 var prev_held_buttons: int = 0
 
@@ -51,7 +55,18 @@ func _ready() -> void:
 	if bus != null:
 		bus.game_over.connect(_on_game_over)
 
-	# 5. Mandatory ROM Ingestion Startup Gate
+	# 5. Instantiate Input Manager & Virtual Touch Gamepad
+	input_mgr = get_node_or_null("/root/InputManager")
+	if input_mgr == null:
+		input_mgr = InputManagerClass.new()
+		input_mgr.name = "InputManager"
+		add_child(input_mgr)
+
+	virtual_pad = VirtualGamepad.new(input_mgr)
+	virtual_pad.name = "VirtualGamepad"
+	add_child(virtual_pad)
+
+	# 6. Mandatory ROM Ingestion Startup Gate
 	var extraction_res: Dictionary = CHRExtractor.auto_ingest_rom()
 	if extraction_res.get("success", false):
 		CHRExtractor.apply_to_registry_and_audio(extraction_res, get_node_or_null("/root/ContentRegistry"), audio_manager)
@@ -67,6 +82,11 @@ func _ready() -> void:
 func _physics_process(_delta: float) -> void:
 	if game_state == null or game_state.current_state == GameStateMachine.State.ROM_SETUP:
 		return
+
+	# Handle runtime shortcuts
+	if InputMap.has_action(Constants.ACTION_TOGGLE_CRT) and Input.is_action_just_pressed(Constants.ACTION_TOGGLE_CRT):
+		if renderer != null:
+			renderer.toggle_crt_shader()
 
 	# Collect controller inputs mapped to NES bitmask
 	var held_buttons: int = _poll_controller_input()
@@ -111,6 +131,9 @@ func _on_game_over() -> void:
 		menu_ctrl.handle_game_over(game_state.current_game_type, game_state.score_mgr.score, game_state.score_mgr.level)
 
 func _poll_controller_input() -> int:
+	if input_mgr != null and input_mgr.has_method("poll_button_mask"):
+		return input_mgr.poll_button_mask()
+
 	var mask: int = 0
 	if Input.is_action_pressed("ui_left"):
 		mask |= Constants.BUTTON_LEFT

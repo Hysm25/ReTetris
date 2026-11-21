@@ -54,6 +54,18 @@ const BUTTON_DOWN: int = 0x04
 const BUTTON_LEFT: int = 0x02
 const BUTTON_RIGHT: int = 0x01
 
+# --- Input Action Names ---
+const ACTION_LEFT: String = "tetris_left"
+const ACTION_RIGHT: String = "tetris_right"
+const ACTION_DOWN: String = "tetris_down"
+const ACTION_UP: String = "tetris_up"
+const ACTION_A: String = "tetris_a"
+const ACTION_B: String = "tetris_b"
+const ACTION_START: String = "tetris_start"
+const ACTION_SELECT: String = "tetris_select"
+const ACTION_TOGGLE_CRT: String = "tetris_toggle_crt"
+const ACTION_RESET: String = "tetris_reset"
+
 # --- Game Modes & Menu Navigation ---
 enum GameType {
 	TYPE_A = 0,

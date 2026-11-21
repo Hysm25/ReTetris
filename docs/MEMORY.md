@@ -133,3 +133,9 @@ updated: 2026-11-20
   - **Retro CRT Scanline Shader**: Added lightweight CanvasItem shader `src/shaders/crt_scanlines.gdshader` with runtime toggle support in `PlayfieldRenderer`.
   - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **13/13 test suites passing cleanly** (including `tests/test_music_engine.gd`).
   - **Next Target Milestone**: Standalone desktop and mobile packaging / input customization.
+- **Phase 5 Completion (Controller Remapping, Input Profiles & Packaging)**:
+  - **InputManager Autoload**: Implemented `src/core/input_manager.gd` managing 8-bit NES button masks at 60 TPS, input profiles (Default Keyboard, WASD, Gamepad Standard, Custom), key/joypad remapping API, JSON persistence (`user://input_config.json`), and 3 SOCD cleaning modes (Neutral, Last Input, Priority).
+  - **Mobile Virtual Gamepad**: Implemented `src/game/virtual_gamepad.gd` multi-touch CanvasLayer emulating authentic NES D-Pad, B/A action buttons, and Start/Select buttons with coordinate translation and mobile auto-activation.
+  - **Export Presets & Standalone Packaging**: Added `export_presets.cfg` covering Linux/X11, Windows, Android, and Web platforms with strict clean-room exclude filters (`TetrisNESDisasm/*`, `*.nes`, etc.), plus FreeDesktop launcher `packaging/retetris.desktop` and packaging runner `scripts/build_package.sh`.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **14/14 test suites passing cleanly** (including `tests/test_input_packaging.gd`).
+  - **Next Target Milestone**: Extended features and modding architecture (custom palettes, skins, dual-board netplay).
