@@ -10,22 +10,22 @@ extends CanvasLayer
 
 const Constants = preload("res://src/core/constants.gd")
 
-# Button bounding rectangles in native 256x240 coordinates
-# D-pad cross centered at (X: 36, Y: 196)
-const DPAD_CENTER: Vector2 = Vector2(36, 196)
+# Button bounding rectangles in viewport coordinates
+# D-pad cross centered at bottom-left margin
+const DEFAULT_DPAD_CENTER: Vector2 = Vector2(36, 196)
 const DPAD_BUTTON_SIZE: Vector2 = Vector2(18, 18)
 
-var rect_dpad_left: Rect2 = Rect2(DPAD_CENTER.x - 28, DPAD_CENTER.y - 9, 18, 18)
-var rect_dpad_right: Rect2 = Rect2(DPAD_CENTER.x + 10, DPAD_CENTER.y - 9, 18, 18)
-var rect_dpad_up: Rect2 = Rect2(DPAD_CENTER.x - 9, DPAD_CENTER.y - 28, 18, 18)
-var rect_dpad_down: Rect2 = Rect2(DPAD_CENTER.x - 9, DPAD_CENTER.y + 10, 18, 18)
+var dpad_center: Vector2 = DEFAULT_DPAD_CENTER
+var rect_dpad_left: Rect2 = Rect2(DEFAULT_DPAD_CENTER.x - 28, DEFAULT_DPAD_CENTER.y - 9, 18, 18)
+var rect_dpad_right: Rect2 = Rect2(DEFAULT_DPAD_CENTER.x + 10, DEFAULT_DPAD_CENTER.y - 9, 18, 18)
+var rect_dpad_up: Rect2 = Rect2(DEFAULT_DPAD_CENTER.x - 9, DEFAULT_DPAD_CENTER.y - 28, 18, 18)
+var rect_dpad_down: Rect2 = Rect2(DEFAULT_DPAD_CENTER.x - 9, DEFAULT_DPAD_CENTER.y + 10, 18, 18)
 
 # Center pill buttons: Select and Start
 var rect_select: Rect2 = Rect2(96, 218, 26, 12)
 var rect_start: Rect2 = Rect2(134, 218, 26, 12)
 
 # Action buttons: B and A on right side
-# Button B at (X: 194, Y: 200), Button A at (X: 228, Y: 188)
 var rect_btn_b: Rect2 = Rect2(186, 194, 22, 22)
 var rect_btn_a: Rect2 = Rect2(220, 182, 22, 22)
 
@@ -50,6 +50,7 @@ var _draw_node: Node2D = null
 func _init(p_input_manager: Node = null) -> void:
 	input_manager = p_input_manager
 	layer = 10 # Sit above gameplay canvas
+	update_layout(Vector2(float(Constants.SCREEN_WIDTH), float(Constants.SCREEN_HEIGHT)))
 
 func _ready() -> void:
 	if input_manager == null:
@@ -60,16 +61,56 @@ func _ready() -> void:
 	_draw_node.draw.connect(_on_draw_overlay)
 	add_child(_draw_node)
 
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		if not vp.size_changed.is_connected(_on_viewport_size_changed):
+			vp.size_changed.connect(_on_viewport_size_changed)
+	update_layout()
+
 	# Auto-enable on mobile platforms
 	if OS.has_feature("mobile") or OS.has_feature("android") or OS.has_feature("ios"):
 		set_active(true)
 	else:
 		set_active(false)
 
+func _on_viewport_size_changed() -> void:
+	update_layout()
+	if _draw_node != null:
+		_draw_node.queue_redraw()
+
+## Dynamically anchors virtual controls relative to the visible viewport boundaries
+func update_layout(custom_size: Vector2 = Vector2.ZERO) -> void:
+	var vp_size: Vector2 = custom_size
+	if vp_size == Vector2.ZERO:
+		var vp: Viewport = get_viewport()
+		if vp != null:
+			vp_size = vp.get_visible_rect().size
+	if vp_size.x <= 0.0 or vp_size.y <= 0.0:
+		vp_size = Vector2(float(Constants.SCREEN_WIDTH), float(Constants.SCREEN_HEIGHT))
+
+	# D-pad center anchored to bottom-left margin
+	dpad_center = Vector2(36.0, vp_size.y - 44.0)
+	rect_dpad_left = Rect2(dpad_center.x - 28.0, dpad_center.y - 9.0, 18.0, 18.0)
+	rect_dpad_right = Rect2(dpad_center.x + 10.0, dpad_center.y - 9.0, 18.0, 18.0)
+	rect_dpad_up = Rect2(dpad_center.x - 9.0, dpad_center.y - 28.0, 18.0, 18.0)
+	rect_dpad_down = Rect2(dpad_center.x - 9.0, dpad_center.y + 10.0, 18.0, 18.0)
+
+	# Action buttons anchored to far bottom-right margin
+	rect_btn_b = Rect2(vp_size.x - 70.0, vp_size.y - 46.0, 22.0, 22.0)
+	rect_btn_a = Rect2(vp_size.x - 36.0, vp_size.y - 58.0, 22.0, 22.0)
+
+	# Center pill buttons: Select and Start anchored to bottom center
+	var center_x: float = vp_size.x * 0.5
+	var bottom_y: float = vp_size.y - 22.0
+	rect_select = Rect2(center_x - 32.0, bottom_y, 26.0, 12.0)
+	rect_start = Rect2(center_x + 6.0, bottom_y, 26.0, 12.0)
+
 func set_active(active: bool) -> void:
 	is_active = active
 	visible = active
-	if not is_active:
+	if is_active:
+		update_layout()
+	else:
 		current_mask = 0
 		touch_points.clear()
 		_sync_with_input_manager()
@@ -80,6 +121,25 @@ func toggle_active() -> void:
 	set_active(not is_active)
 
 func _input(event: InputEvent) -> void:
+	# Auto-show on touch screen event
+	if event is InputEventScreenTouch and event.pressed:
+		if not is_active:
+			set_active(true)
+
+	# Auto-hide on physical keyboard or hardware gamepad input
+	if is_active:
+		if event is InputEventKey and event.pressed and not event.echo:
+			set_active(false)
+			return
+		elif event is InputEventJoypadButton and event.pressed:
+			set_active(false)
+			return
+		elif event is InputEventJoypadMotion:
+			var deadzone: float = input_manager.joypad_deadzone if (input_manager != null and "joypad_deadzone" in input_manager) else 0.3
+			if absf(event.axis_value) > deadzone:
+				set_active(false)
+				return
+
 	if not is_active:
 		return
 
@@ -97,7 +157,6 @@ func _handle_touch_event(touch_id: int, screen_pos: Vector2, pressed: bool) -> v
 	if not pressed:
 		touch_points.erase(touch_id)
 	else:
-		# Convert screen coordinates to 256x240 viewport space
 		var vp_pos: Vector2 = _screen_to_viewport(screen_pos)
 		var mask: int = _hit_test(vp_pos)
 		touch_points[touch_id] = mask
@@ -114,18 +173,7 @@ func _handle_touch_event(touch_id: int, screen_pos: Vector2, pressed: bool) -> v
 			_draw_node.queue_redraw()
 
 func _screen_to_viewport(pos: Vector2) -> Vector2:
-	var vp: Viewport = get_viewport()
-	if vp == null:
-		return pos
-	var vp_size: Vector2 = Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT)
-	var win_size: Vector2 = Vector2(vp.get_visible_rect().size)
-	if win_size.x <= 0 or win_size.y <= 0:
-		return pos
-	var scale_factor: float = mini(int(win_size.x / vp_size.x), int(win_size.y / vp_size.y))
-	if scale_factor <= 0:
-		scale_factor = 1.0
-	var offset: Vector2 = (win_size - vp_size * scale_factor) * 0.5
-	return (pos - offset) / scale_factor
+	return pos
 
 func _hit_test(pos: Vector2) -> int:
 	var mask: int = 0

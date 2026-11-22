@@ -13,6 +13,7 @@ static func run_tests() -> bool:
 	test_drop_lock_and_are_transition()
 	test_line_clear_animation_sequence()
 	test_topout_game_over()
+	test_soft_drop_scoring_lifecycle()
 	print("  -> TestGameSimulation: PASSED")
 	return true
 
@@ -109,4 +110,75 @@ static func test_topout_game_over() -> void:
 	gsm.step_frame(0, 0)
 
 	assert(gsm.current_state == GameStateMachine.State.GAME_OVER, "Blocked spawn must immediately trigger GAME_OVER")
+	gsm.free()
+
+static func test_soft_drop_scoring_lifecycle() -> void:
+	var gsm = GameStateMachine.new()
+	gsm.is_headless_testing = true
+	gsm.start_game(0, 100)
+
+	# 1. Spawn piece at (5, 18)
+	gsm.piece.position = Vector2i(5, 18)
+	assert(gsm.score_mgr.score == 0)
+
+	var shifted_emitted: bool = false
+	var bus_script = preload("res://src/core/event_bus.gd")
+	var bus: Node = bus_script.new()
+	gsm.custom_event_bus = bus
+	var shift_callable: Callable = func(_t: int, _p: Vector2i, _o: int) -> void: shifted_emitted = true
+	bus.piece_shifted.connect(shift_callable)
+
+	# 2. Hold Down (BUTTON_DOWN)
+	# Frame 1: soft drop frame 1 (does not drop yet, score remains 0)
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.piece.position.y == 18)
+	assert(gsm.score_mgr.score == 0, "Score must NOT increment on non-drop frames")
+
+	# Frame 2: soft drop frame 2 (drops to y=19, score MUST STILL BE 0 until lock!)
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.piece.position.y == 19)
+	assert(gsm.score_mgr.score == 0, "Score must NOT increment during active falling (only upon lock)")
+
+	# Frame 3: soft drop frame 1
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.piece.position.y == 19)
+	assert(gsm.score_mgr.score == 0)
+
+	# Frame 4: soft drop frame 2 (drops to y=20)
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.piece.position.y == 20)
+	assert(gsm.score_mgr.score == 0, "Score remains 0 while falling")
+
+	# Frame 5: soft drop frame 1
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.piece.position.y == 20)
+
+	# Frame 6: soft drop frame 2 (attempt y=21 -> contacts floor -> LOCKS!)
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.current_state == GameStateMachine.State.ARE_DELAY, "State must transition to ARE_DELAY after lock")
+	assert(gsm.score_mgr.score == 2, "2 soft-dropped cells must award exactly 2 points upon piece lock")
+	assert(not shifted_emitted, "Vertical soft drop must not emit piece_shifted or trigger shift SFX")
+	if bus != null and bus.piece_shifted.is_connected(shift_callable):
+		bus.piece_shifted.disconnect(shift_callable)
+
+	# Reset and test Down release before lock
+	gsm.start_game(0, 100)
+	gsm.piece.position = Vector2i(5, 18)
+	# Drop 1 cell with Down held
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	gsm.step_frame(Constants.BUTTON_DOWN, 0)
+	assert(gsm.piece.position.y == 19)
+	assert(gsm.score_mgr.score == 0)
+
+	# Release Down before locking -> drop points must reset to 0!
+	gsm.step_frame(0, 0)
+	gsm.piece.gravity_timer = 47
+	gsm.step_frame(0, 0) # gravity drops to 20
+	gsm.piece.gravity_timer = 47
+	gsm.step_frame(0, 0) # gravity locks at floor
+	assert(gsm.current_state == GameStateMachine.State.ARE_DELAY)
+	assert(gsm.score_mgr.score == 0, "Score must remain 0 if Down was released before piece lock")
+
+	gsm.custom_event_bus = null
+	bus.free()
 	gsm.free()

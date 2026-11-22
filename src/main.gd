@@ -73,6 +73,7 @@ func _ready() -> void:
 		var reg: Node = get_node_or_null("/root/ContentRegistry")
 		if reg != null:
 			demo_ctrl.setup(reg.get_demo_buttons_table(), reg.get_demo_tetrimino_type_table())
+
 		menu_ctrl.reset_to_title()
 	else:
 		# Refuse to start: transition to ROM_SETUP state and display missing ROM prompt
@@ -87,6 +88,8 @@ func _physics_process(_delta: float) -> void:
 	if InputMap.has_action(Constants.ACTION_TOGGLE_CRT) and Input.is_action_just_pressed(Constants.ACTION_TOGGLE_CRT):
 		if renderer != null:
 			renderer.toggle_crt_shader()
+	if InputMap.has_action(Constants.ACTION_TOGGLE_FULLSCREEN) and Input.is_action_just_pressed(Constants.ACTION_TOGGLE_FULLSCREEN):
+		toggle_fullscreen()
 
 	# Collect controller inputs mapped to NES bitmask
 	var held_buttons: int = _poll_controller_input()
@@ -152,3 +155,16 @@ func _poll_controller_input() -> int:
 	if Input.is_key_pressed(KEY_SHIFT):
 		mask |= Constants.BUTTON_SELECT
 	return mask
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var key_event: InputEventKey = event as InputEventKey
+		if key_event.keycode == KEY_F11 or (key_event.keycode == KEY_ENTER and key_event.alt_pressed):
+			toggle_fullscreen()
+
+func toggle_fullscreen() -> void:
+	var mode: DisplayServer.WindowMode = DisplayServer.window_get_mode()
+	if mode == DisplayServer.WINDOW_MODE_FULLSCREEN or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)

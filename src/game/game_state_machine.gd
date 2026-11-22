@@ -21,9 +21,10 @@ enum State {
 	ROM_SETUP = 5,
 	CURTAIN_WIPE = 6,
 	ENDING_ANIMATION = 7,
+	MENU = 8,
 }
 
-var current_state: State = State.SPAWNING
+var current_state: State = State.MENU
 var current_game_type: int = Constants.GameType.TYPE_A
 var grid: BoardGrid
 var das: DASHandler
@@ -39,6 +40,7 @@ var completed_rows: Array[int] = []
 
 # Optional manual stepping flag (for automated unit testing)
 var is_headless_testing: bool = false
+var custom_event_bus: Node = null
 
 # Topout Curtain Wipe and Rocket Ending State
 var enable_curtain_wipe: bool = true
@@ -146,15 +148,12 @@ func _process_active_play(held_buttons: int, newly_pressed_buttons: int) -> void
 	var shift_dx: int = das.process_input(held_buttons, newly_pressed_buttons)
 	if shift_dx != 0:
 		if piece.shift(shift_dx, grid):
+			_emit_piece_shifted(piece.piece_type, piece.position, piece.orientation)
 			_emit_piece_moved(piece.piece_type, piece.position, piece.orientation)
 
-	# 3. Gravity and Soft Drop
+	# 3. Gravity and Soft Drop (neither triggers SFX in authentic 1989 NES Tetris)
 	var down_held: bool = (held_buttons & Constants.BUTTON_DOWN) != 0
 	var grav_res: Dictionary = piece.tick_gravity(score_mgr.level, down_held, grid)
-
-	if grav_res["soft_drop_point"]:
-		var pts: int = score_mgr.add_soft_drop_points(1)
-		_emit_score_updated(score_mgr.score, pts)
 
 	if grav_res["moved_down"]:
 		_emit_piece_moved(piece.piece_type, piece.position, piece.orientation)
@@ -163,6 +162,13 @@ func _process_active_play(held_buttons: int, newly_pressed_buttons: int) -> void
 		_on_piece_locked()
 
 func _on_piece_locked() -> void:
+	# Authentic 1989 NES Tetris soft-drop scoring:
+	# Points are awarded strictly upon lock if Down was held to the surface.
+	var drop_pts: int = piece.get_and_clear_drop_points()
+	if drop_pts > 0:
+		var pts: int = score_mgr.add_soft_drop_points(drop_pts)
+		_emit_score_updated(score_mgr.score, pts)
+
 	var locked_rows: Array[int] = grid.lock_piece(piece.piece_type, piece.position, piece.orientation)
 	var lock_y: int = piece.position.y
 	if not locked_rows.is_empty():
@@ -268,6 +274,8 @@ func _read_input_just_pressed() -> int:
 # --- EventBus helper dispatchers (safe when running in isolation or tree) ---
 
 func _get_event_bus() -> Node:
+	if custom_event_bus != null:
+		return custom_event_bus
 	if is_inside_tree() and get_tree().root.has_node("EventBus"):
 		return get_tree().root.get_node("EventBus")
 	return null
@@ -281,6 +289,12 @@ func _emit_piece_moved(p_type: int, pos: Vector2i, orient: int) -> void:
 	var bus = _get_event_bus()
 	if bus:
 		bus.piece_moved.emit(p_type, pos, orient)
+
+func _emit_piece_shifted(p_type: int, pos: Vector2i, orient: int) -> void:
+	var bus = _get_event_bus()
+	if bus:
+		if bus.has_signal("piece_shifted"):
+			bus.piece_shifted.emit(p_type, pos, orient)
 
 func _emit_piece_rotated(p_type: int, pos: Vector2i, orient: int) -> void:
 	var bus = _get_event_bus()

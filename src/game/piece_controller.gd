@@ -16,6 +16,7 @@ var is_active: bool = false
 var gravity_timer: int = 0
 var soft_drop_timer: int = 0
 var soft_drop_cells: int = 0
+var drop_points: int = 0
 
 func reset() -> void:
 	piece_type = Constants.PieceType.T
@@ -25,6 +26,7 @@ func reset() -> void:
 	gravity_timer = 0
 	soft_drop_timer = 0
 	soft_drop_cells = 0
+	drop_points = 0
 
 ## Spawns a piece at the spawn position (default: (5, 0)) with authentic spawn orientation.
 ## Returns true if spawned without collision; false if immediately blocked (lockout/topout).
@@ -35,6 +37,7 @@ func spawn(type: int, grid: BoardGrid, start_pos: Vector2i = Constants.SPAWN_POS
 	gravity_timer = 0
 	soft_drop_timer = 0
 	soft_drop_cells = 0
+	drop_points = 0
 	is_active = true
 
 	var can_spawn: bool = grid.can_place_piece(piece_type, position, orientation)
@@ -75,12 +78,13 @@ func rotate_ccw(grid: BoardGrid) -> bool:
 ## If down_held is true: soft drop rate (1 drop every 2 frames).
 ## Otherwise: normal gravity rate (1 drop every gravity_frames).
 ## Returns Dictionary with status:
-## { "moved_down": bool, "locked": bool, "soft_drop_point": bool }
+## { "moved_down": bool, "locked": bool, "soft_drop_point": bool, "drop_points_awarded": int }
 func tick_gravity(level: int, down_held: bool, grid: BoardGrid) -> Dictionary:
 	var result: Dictionary = {
 		"moved_down": false,
 		"locked": false,
 		"soft_drop_point": false,
+		"drop_points_awarded": 0,
 	}
 
 	if not is_active:
@@ -99,12 +103,19 @@ func tick_gravity(level: int, down_held: bool, grid: BoardGrid) -> Dictionary:
 			is_soft_drop = true
 	else:
 		soft_drop_timer = 0
+		# Authentic 1989 NES Tetris: if Down is released before lock, holdDownPoints resets to 0 (main.asm:1559)
+		drop_points = 0
+		soft_drop_cells = 0
 		gravity_timer += 1
 		if gravity_timer >= gravity_frames:
 			gravity_timer = 0
 			should_drop = true
 
 	if should_drop:
+		if is_soft_drop:
+			# Increments holdDownPoints on each soft-drop attempt (main.asm:1569)
+			drop_points += 1
+
 		var target_pos: Vector2i = position + Vector2i(0, 1)
 		if grid.can_place_piece(piece_type, target_pos, orientation):
 			position = target_pos
@@ -116,8 +127,23 @@ func tick_gravity(level: int, down_held: bool, grid: BoardGrid) -> Dictionary:
 			# Surface contact -> Instant lock on contact!
 			is_active = false
 			result["locked"] = true
+			# Authentic 1989 NES Tetris addHoldDownPoints (main.asm:3436):
+			# cmp #$02; bmi addLineClearPoints; dec score; adc score (awards holdDownPoints - 1)
+			if is_soft_drop and drop_points >= 2:
+				result["drop_points_awarded"] = drop_points - 1
+			else:
+				result["drop_points_awarded"] = 0
 
 	return result
+
+## Returns and clears any accumulated soft-drop points to award upon piece lock.
+## In authentic 1989 NES Tetris (main.asm:3436):
+## If holdDownPoints >= 2, awards (holdDownPoints - 1) points; otherwise 0.
+func get_and_clear_drop_points() -> int:
+	var pts: int = (drop_points - 1) if drop_points >= 2 else 0
+	drop_points = 0
+	soft_drop_cells = 0
+	return pts
 
 ## Returns the array of 4 absolute playfield grid coordinates for the active piece's minos.
 func get_mino_positions() -> Array[Vector2i]:

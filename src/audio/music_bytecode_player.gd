@@ -26,11 +26,18 @@ class ChannelState:
 	var vol_base: int = 0
 	var vol_frame_counter: int = 0
 	var noise_period: float = 0.001
+	var is_periodic_noise: bool = false
+	var reset_phase: bool = false
 
 var channels: Array[ChannelState] = []
 var currently_playing_track: int = -1
 var note_offset: int = 0
 var duration_offset: int = 0
+
+# Authentic 16-entry NES APU Noise Timer Period Table (CPU cycle counts)
+const NOISE_PERIOD_TABLE: Array[int] = [
+	4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
+]
 
 # Authentic tables loaded from PRG-ROM
 var prg_rom: PackedByteArray = PackedByteArray()
@@ -165,6 +172,9 @@ func step_frame() -> void:
 			ch.vol_frame_counter = 0
 			_execute_channel_instructions(ch_idx)
 		else:
+			if ch_idx == 2 and ch.note_duration_remaining == 1:
+				# Authentic 2A03 APU Triangle linear counter expiration on final frame of note
+				ch.volume = 0.0
 			_update_channel_envelope(ch_idx)
 
 func _execute_channel_instructions(ch_idx: int) -> void:
@@ -219,15 +229,25 @@ func _execute_channel_instructions(ch_idx: int) -> void:
 
 			ch.note_duration_remaining = ch.note_duration
 			ch.current_note = note_byte
+			if ch_idx == 0 or ch_idx == 1:
+				ch.reset_phase = true
 
 			if ch_idx == 3: # Noise Channel
+				# Authentic NES Tetris playNoise ($E9EB): y = (note_byte & 0x3F) directly indexes $E5AB
 				var noise_idx: int = (note_byte & 0x3F)
-				var base_n: int = noise_idx * 3
-				if base_n + 2 < noises_table.size():
-					var n_vol: int = noises_table[base_n]
-					var n_lo: int = noises_table[base_n + 1]
-					ch.volume = float(n_vol & 0x0F) / 15.0
-					ch.noise_period = (float(n_lo & 0x0F) + 1.0) * 0.0001
+				if noise_idx + 2 < noises_table.size():
+					var n_vol: int = noises_table[noise_idx]
+					var n_lo: int = noises_table[noise_idx + 1]
+					var is_const_vol: bool = (n_vol & 0x10) != 0
+					if is_const_vol:
+						ch.volume = float(n_vol & 0x0F) / 15.0
+					else:
+						# Envelope decay mode: start at 0.8 and decay frame by frame
+						ch.volume = 0.8
+					ch.is_periodic_noise = (n_lo & 0x80) != 0
+					var period_idx: int = n_lo & 0x0F
+					var cpu_cycles: int = NOISE_PERIOD_TABLE[period_idx] if period_idx < NOISE_PERIOD_TABLE.size() else 4
+					ch.noise_period = float(cpu_cycles) / Constants.NES_CPU_FREQ
 				else:
 					ch.volume = 0.0
 			else:
@@ -259,8 +279,17 @@ func _execute_channel_instructions(ch_idx: int) -> void:
 			break
 
 func _update_channel_envelope(ch_idx: int) -> void:
-	if ch_idx >= 2:
-		return # Triangle and Noise channels do not use the Pulse envelope table
+	if ch_idx == 3:
+		# Authentic hardware envelope decay for noise channel percussion
+		var ch_noise: ChannelState = channels[3]
+		if ch_noise.volume > 0.0:
+			ch_noise.volume = ch_noise.volume * 0.60
+			if ch_noise.volume < 0.02:
+				ch_noise.volume = 0.0
+		return
+
+	if ch_idx == 2:
+		return # Triangle channel does not use volume envelopes
 
 	var ch: ChannelState = channels[ch_idx]
 	var env_idx: int = (ch.vol_control & 0x1F) - 1
@@ -274,17 +303,17 @@ func _update_channel_envelope(ch_idx: int) -> void:
 	var env_byte: int = read_prg(env_ptr + byte_idx)
 
 	if env_byte == 0xFF:
-		# Sustain last volume
-		pass
+		# Sustain last volume (hold without advancing frame counter)
+		return
 	elif env_byte == 0xF0:
-		# Release / mute
+		# Release / mute (hold mute without advancing frame counter)
 		ch.volume = 0.0
+		return
 	else:
 		var nibble: int = (env_byte >> 4) & 0x0F if (ch.vol_frame_counter & 1) == 0 else (env_byte & 0x0F)
 		ch.duty = (ch.vol_base >> 6) & 3
 		ch.volume = float(nibble) / 15.0
-
-	ch.vol_frame_counter += 1
+		ch.vol_frame_counter += 1
 
 ## Halts music playback and mutes all channels.
 func stop_music() -> void:

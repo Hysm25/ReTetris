@@ -22,7 +22,7 @@ var menu_ctrl: RefCounted = null
 # Cached HUD and Game State
 var current_level: int = 0
 var current_score: int = 0
-var top_score: int = 0
+var top_score: int = 10000
 var current_lines: int = 0
 var next_piece_type: int = Constants.PieceType.T
 var piece_stats: Array[int] = [0, 0, 0, 0, 0, 0, 0] # T, J, Z, O, S, L, I
@@ -80,7 +80,22 @@ func _init(p_game_state: GameStateMachine = null, p_menu_ctrl: RefCounted = null
 
 func _ready() -> void:
 	_hud_font = ThemeDB.fallback_font
+	refresh_top_score()
 	_connect_event_bus()
+
+## Refreshes the top score from HighScoreManager for the active game type.
+func refresh_top_score() -> void:
+	var g_type: int = Constants.GameType.TYPE_A
+	if game_state != null:
+		g_type = game_state.current_game_type
+	elif menu_ctrl != null:
+		g_type = int(menu_ctrl.get("game_type"))
+
+	var hs_mgr: RefCounted = menu_ctrl.get("high_score_mgr") if menu_ctrl != null else null
+	if hs_mgr != null and hs_mgr.has_method("get_top_score"):
+		top_score = hs_mgr.get_top_score(g_type)
+	else:
+		top_score = 10000 if g_type == Constants.GameType.TYPE_A else 2000
 
 func _connect_event_bus() -> void:
 	var bus: Node = get_node_or_null("/root/EventBus")
@@ -118,13 +133,21 @@ func _process(_delta: float) -> void:
 		current_lines = game_state.score_mgr.lines
 		next_piece_type = game_state.next_piece_type
 		is_game_over = (game_state.current_state == GameStateMachine.State.GAME_OVER)
-		if current_score > top_score:
-			top_score = current_score
 	queue_redraw()
 
 # --- Draw Logic ---
 
 func _draw() -> void:
+	var vp_size: Vector2 = get_viewport_rect().size
+	var stage_origin: Vector2 = ((vp_size - Vector2(float(Constants.SCREEN_WIDTH), float(Constants.SCREEN_HEIGHT))) * 0.5).floor()
+
+	# 1. Seamless Widescreen / Fullscreen Background Tiling
+	if vp_size.x > float(Constants.SCREEN_WIDTH) or vp_size.y > float(Constants.SCREEN_HEIGHT):
+		_draw_outer_widescreen_background(vp_size, stage_origin)
+
+	# 2. Transform into centered 256x240 stage coordinate space
+	draw_set_transform(stage_origin, 0.0, Vector2.ONE)
+
 	if game_state != null and game_state.current_state == GameStateMachine.State.ROM_SETUP:
 		_draw_rom_setup_screen()
 		return
@@ -157,6 +180,52 @@ func _draw() -> void:
 	if is_game_over:
 		_draw_game_over_banner()
 
+func _draw_outer_widescreen_background(vp_size: Vector2, stage_origin: Vector2) -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	var is_menu: bool = true
+	if menu_ctrl != null:
+		var mode: int = int(menu_ctrl.get("current_mode"))
+		if mode == Constants.MenuMode.IN_GAME or mode == Constants.MenuMode.DEMO:
+			is_menu = false
+		else:
+			is_menu = true
+	elif game_state != null:
+		if game_state.current_state == GameStateMachine.State.MENU or game_state.current_state == GameStateMachine.State.ROM_SETUP:
+			is_menu = true
+		else:
+			is_menu = false
+
+	var tile_tex: Texture2D = null
+	if reg != null:
+		if reg.has_method("get_background_pattern_tile_texture"):
+			tile_tex = reg.get_background_pattern_tile_texture(is_menu)
+		else:
+			tile_tex = reg.get("background_pattern_tile_texture")
+
+	if tile_tex == null:
+		draw_rect(Rect2(Vector2.ZERO, vp_size), COLOR_BLACK)
+		return
+
+	var p_size: Vector2 = tile_tex.get_size()
+	var pw: float = p_size.x if p_size.x > 0.0 else 64.0
+	var ph: float = p_size.y if p_size.y > 0.0 else 64.0
+
+	# Align tiling grid directly with stage_origin to prevent any seams
+	var start_x: float = fmod(stage_origin.x, pw)
+	if start_x > 0.0:
+		start_x -= pw
+	var start_y: float = fmod(stage_origin.y, ph)
+	if start_y > 0.0:
+		start_y -= ph
+
+	var cur_y: float = start_y
+	while cur_y < vp_size.y:
+		var cur_x: float = start_x
+		while cur_x < vp_size.x:
+			draw_texture(tile_tex, Vector2(cur_x, cur_y))
+			cur_x += pw
+		cur_y += ph
+
 func _draw_title_screen() -> void:
 	var reg: Node = get_node_or_null("/root/ContentRegistry")
 	if reg != null and reg.has_method("get_title_screen_texture"):
@@ -164,12 +233,9 @@ func _draw_title_screen() -> void:
 		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
 			draw_texture(tex, Vector2.ZERO)
 		else:
-			_draw_text("TETRIS", Vector2(104, 70), COLOR_WHITE)
+			_draw_nes_text("TETRIS", Vector2(104, 70), COLOR_WHITE)
 	else:
-		_draw_text("TETRIS", Vector2(104, 70), COLOR_WHITE)
-
-	if menu_ctrl != null and (int(menu_ctrl.get("cursor_timer")) & 0x10) != 0:
-		_draw_text("PUSH START BUTTON", Vector2(56, 170), COLOR_WHITE)
+		_draw_nes_text("TETRIS", Vector2(104, 70), COLOR_WHITE)
 
 func _draw_game_type_menu() -> void:
 	var reg: Node = get_node_or_null("/root/ContentRegistry")
@@ -182,15 +248,36 @@ func _draw_game_type_menu() -> void:
 		return
 
 	var timer: int = int(menu_ctrl.get("cursor_timer"))
-	if (timer & 0x08) != 0:
-		var g_type: int = int(menu_ctrl.get("game_type"))
-		var cursor_x: float = 48.0 if g_type == Constants.GameType.TYPE_A else 144.0
-		draw_rect(Rect2(cursor_x, 56, 64, 24), COLOR_BORDER_ACCENT, false, 2.0)
+	var arrow_r: Texture2D = reg.get_cursor_arrow_texture(false) if reg != null else null
+	var arrow_l: Texture2D = reg.get_cursor_arrow_texture(true) if reg != null else null
 
-	if (timer & 0x08) != 0:
+	# Authentic NES Tetris sprite01GameTypeCursor:
+	# Y = 63 ($3F). Type A: X = 63 ($3F), Type B: X = 159 ($9F).
+	# Left arrow (>) at (X, Y), Right arrow (<, flipped) at (X + 58, Y).
+	# Authentic flicker: (timer & 0x03) != 0 (3 frames on, 1 frame off).
+	if (timer & 0x03) != 0:
+		var g_type: int = int(menu_ctrl.get("game_type"))
+		var gx: float = 63.0 if g_type == Constants.GameType.TYPE_A else 159.0
+		var gy: float = 63.0
+		if arrow_r != null and arrow_l != null:
+			draw_texture(arrow_r, Vector2(gx, gy))
+			draw_texture(arrow_l, Vector2(gx + 58.0, gy))
+		else:
+			draw_rect(Rect2(gx + 8.0, gy, 50.0, 8.0), COLOR_BORDER_ACCENT, false, 1.0)
+
+	# Authentic NES Tetris sprite53MusicTypeCursor:
+	# X = 103 ($67). Y = 143 ($8F) + music_type * 16.
+	# Left arrow at (X, Y), Right arrow at (X + 74, Y).
+	# Authentic flicker: (timer & 0x03) != 0.
+	if (timer & 0x03) != 0:
 		var m_type: int = int(menu_ctrl.get("music_type"))
-		var music_y: float = 135.0 + float(m_type) * 16.0
-		draw_rect(Rect2(88, music_y, 80, 14), COLOR_WHITE, false, 1.0)
+		var mx: float = 103.0
+		var my: float = 143.0 + float(m_type) * 16.0
+		if arrow_r != null and arrow_l != null:
+			draw_texture(arrow_r, Vector2(mx, my))
+			draw_texture(arrow_l, Vector2(mx + 74.0, my))
+		else:
+			draw_rect(Rect2(mx + 8.0, my, 66.0, 8.0), COLOR_WHITE, false, 1.0)
 
 func _draw_level_menu() -> void:
 	var reg: Node = get_node_or_null("/root/ContentRegistry")
@@ -207,30 +294,47 @@ func _draw_level_menu() -> void:
 	var sel_lvl: int = int(menu_ctrl.get("selected_level")) % 10
 	var col: int = sel_lvl % 5
 	var row: int = sel_lvl / 5
-	var lx: float = 48.0 + float(col) * 16.0
-	var ly: float = 78.0 + float(row) * 16.0
+	# Authentic NES Tetris levelToSpriteXOffset ($34 + col * 16) and levelToSpriteYOffset ($53 / $63)
+	var lx: float = 52.0 + float(col) * 16.0
+	var ly: float = 83.0 if row == 0 else 99.0
 
 	var is_sel_height: bool = bool(menu_ctrl.get("selecting_height"))
 	var show_lvl: bool = true
 	if not is_sel_height:
-		show_lvl = ((timer & 0x08) != 0)
+		show_lvl = ((timer & 0x03) != 0)
 
 	if show_lvl:
-		draw_rect(Rect2(lx, ly, 14, 14), COLOR_BORDER_ACCENT, false, 2.0)
+		draw_rect(Rect2(lx, ly, 16.0, 16.0), COLOR_BORDER_ACCENT, false, 1.0)
 
 	if g_type == Constants.GameType.TYPE_B:
 		var sel_h: int = int(menu_ctrl.get("selected_height"))
 		var h_col: int = sel_h % 3
 		var h_row: int = sel_h / 3
-		var hx: float = 152.0 + float(h_col) * 16.0
-		var hy: float = 78.0 + float(h_row) * 16.0
+		# Authentic NES Tetris heightToPpuLowAddr ($9C + col * 16) and heightToPpuHighAddr ($53 / $63)
+		var hx: float = 156.0 + float(h_col) * 16.0
+		var hy: float = 83.0 if h_row == 0 else 99.0
 
 		var show_h: bool = true
 		if is_sel_height:
-			show_h = ((timer & 0x08) != 0)
+			show_h = ((timer & 0x03) != 0)
 
 		if show_h:
-			draw_rect(Rect2(hx, hy, 14, 14), COLOR_BORDER_ACCENT, false, 2.0)
+			draw_rect(Rect2(hx, hy, 16.0, 16.0), COLOR_BORDER_ACCENT, false, 1.0)
+
+	# Authentic High Scores Display at the bottom of the Level Menu (rows 20, 22, 24)
+	var hs_mgr: RefCounted = menu_ctrl.get("high_score_mgr") if menu_ctrl != null else null
+	if hs_mgr != null:
+		var entries: Array = hs_mgr.call("get_entries", g_type)
+		var y_offsets: Array[float] = [160.0, 176.0, 192.0]
+		for i in range(mini(3, entries.size())):
+			var entry: Dictionary = entries[i] as Dictionary
+			var y: float = y_offsets[i]
+			var name_str: String = String(entry.get("name", "      "))
+			var score_val: int = int(entry.get("score", 0))
+			var level_val: int = int(entry.get("level", 0))
+			_draw_nes_text(name_str, Vector2(72, y), COLOR_WHITE)
+			_draw_nes_text("%06d" % score_val, Vector2(136, y), COLOR_WHITE)
+			_draw_nes_text("%02d" % level_val, Vector2(192, y), COLOR_WHITE)
 
 func _draw_high_score_table() -> void:
 	var reg: Node = get_node_or_null("/root/ContentRegistry")
@@ -240,22 +344,19 @@ func _draw_high_score_table() -> void:
 			draw_texture(tex, Vector2.ZERO)
 		else:
 			draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
-			_draw_text("TOP - 3", Vector2(104, 50), COLOR_WHITE)
+			_draw_nes_text("TOP - 3", Vector2(104, 50), COLOR_WHITE)
 	else:
 		draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
-		_draw_text("TOP - 3", Vector2(104, 50), COLOR_WHITE)
+		_draw_nes_text("TOP - 3", Vector2(104, 50), COLOR_WHITE)
 
 	if menu_ctrl == null or menu_ctrl.get("high_score_mgr") == null:
 		return
 
 	var g_type: int = int(menu_ctrl.get("game_type"))
-	var type_label: String = "A-TYPE" if g_type == Constants.GameType.TYPE_A else "B-TYPE"
-	_draw_text(type_label, Vector2(108, 120), COLOR_WHITE)
-
 	var hs_mgr: RefCounted = menu_ctrl.get("high_score_mgr")
 	var entries: Array = hs_mgr.call("get_entries", g_type)
 
-	var y_offsets: Array[float] = [159.0, 175.0, 191.0]
+	var y_offsets: Array[float] = [160.0, 176.0, 192.0]
 	for i in range(mini(3, entries.size())):
 		var entry: Dictionary = entries[i] as Dictionary
 		var y: float = y_offsets[i]
@@ -263,9 +364,9 @@ func _draw_high_score_table() -> void:
 		var score_val: int = int(entry.get("score", 0))
 		var level_val: int = int(entry.get("level", 0))
 
-		_draw_text(name_str, Vector2(72, y), COLOR_WHITE)
-		_draw_text("%06d" % score_val, Vector2(136, y), COLOR_WHITE)
-		_draw_text("%02d" % level_val, Vector2(192, y), COLOR_WHITE)
+		_draw_nes_text(name_str, Vector2(72, y), COLOR_WHITE)
+		_draw_nes_text("%06d" % score_val, Vector2(136, y), COLOR_WHITE)
+		_draw_nes_text("%02d" % level_val, Vector2(192, y), COLOR_WHITE)
 
 func _draw_high_score_entry() -> void:
 	var reg: Node = get_node_or_null("/root/ContentRegistry")
@@ -275,18 +376,15 @@ func _draw_high_score_entry() -> void:
 			draw_texture(tex, Vector2.ZERO)
 		else:
 			draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
-			_draw_text("CONGRATULATIONS", Vector2(72, 50), COLOR_WHITE)
+			_draw_nes_text("CONGRATULATIONS", Vector2(72, 50), COLOR_WHITE)
 	else:
 		draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
-		_draw_text("CONGRATULATIONS", Vector2(72, 50), COLOR_WHITE)
+		_draw_nes_text("CONGRATULATIONS", Vector2(72, 50), COLOR_WHITE)
 
 	if menu_ctrl == null or menu_ctrl.get("high_score_mgr") == null:
 		return
 
 	var g_type: int = int(menu_ctrl.get("entry_game_type"))
-	var type_label: String = "A-TYPE" if g_type == Constants.GameType.TYPE_A else "B-TYPE"
-	_draw_text(type_label, Vector2(108, 120), COLOR_WHITE)
-
 	var hs_mgr: RefCounted = menu_ctrl.get("high_score_mgr")
 	var entries: Array = hs_mgr.call("get_entries", g_type)
 	var rank: int = int(menu_ctrl.get("entry_rank"))
@@ -294,35 +392,47 @@ func _draw_high_score_entry() -> void:
 	var timer: int = int(menu_ctrl.get("cursor_timer"))
 	var name_chars: Array = menu_ctrl.get("entry_name_chars") as Array
 
-	var y_offsets: Array[float] = [159.0, 175.0, 191.0]
+	var y_offsets: Array[float] = [160.0, 176.0, 192.0]
 	for i in range(mini(3, entries.size())):
 		var y: float = y_offsets[i]
 		if i == rank:
 			# Currently edited entry row
-			var full_name: String = "".join(name_chars)
-			_draw_text(full_name, Vector2(72, y), COLOR_WHITE)
+			# Authentic sprite0EHighScoreNameCursor: 8x8 solid box behind letter
+			var is_cursor_visible: bool = ((timer & 0x03) != 0)
+			for c_i in range(6):
+				var cx: float = 72.0 + float(c_i) * 8.0
+				var ch: String = name_chars[c_i] if c_i < name_chars.size() else " "
+				if c_i == cursor_idx and is_cursor_visible:
+					draw_rect(Rect2(cx, y, 8.0, 8.0), COLOR_TEXT_RED)
+					_draw_nes_text(ch, Vector2(cx, y), COLOR_BLACK)
+				else:
+					_draw_nes_text(ch, Vector2(cx, y), COLOR_WHITE)
+
 			var sc: int = int(menu_ctrl.get("entry_score"))
 			var lvl: int = int(menu_ctrl.get("entry_level"))
-			_draw_text("%06d" % sc, Vector2(136, y), COLOR_WHITE)
-			_draw_text("%02d" % lvl, Vector2(192, y), COLOR_WHITE)
-
-			# Flashing cursor underline under selected letter
-			if (timer & 0x08) != 0:
-				var cx: float = 72.0 + cursor_idx * 8.0
-				draw_rect(Rect2(cx, y + 1.0, 7.0, 1.0), COLOR_WHITE)
+			_draw_nes_text("%06d" % sc, Vector2(136, y), COLOR_WHITE)
+			_draw_nes_text("%02d" % lvl, Vector2(192, y), COLOR_WHITE)
 		else:
 			# Existing high score entry
 			var lookup_idx: int = i if i < rank else i - 1
 			if lookup_idx >= 0 and lookup_idx < entries.size():
 				var entry: Dictionary = entries[lookup_idx] as Dictionary
-				_draw_text(String(entry.get("name", "      ")), Vector2(72, y), COLOR_WHITE)
-				_draw_text("%06d" % int(entry.get("score", 0)), Vector2(136, y), COLOR_WHITE)
-				_draw_text("%02d" % int(entry.get("level", 0)), Vector2(192, y), COLOR_WHITE)
+				_draw_nes_text(String(entry.get("name", "      ")), Vector2(72, y), COLOR_WHITE)
+				_draw_nes_text("%06d" % int(entry.get("score", 0)), Vector2(136, y), COLOR_WHITE)
+				_draw_nes_text("%02d" % int(entry.get("level", 0)), Vector2(192, y), COLOR_WHITE)
 
 func _draw_ending_animation() -> void:
+	if game_state == null:
+		return
+
 	var reg: Node = get_node_or_null("/root/ContentRegistry")
-	if reg != null and reg.has_method("get_type_a_ending_texture"):
-		var tex: ImageTexture = reg.get_type_a_ending_texture()
+	var tier: int = game_state.ending_tier
+	var rx: float = game_state.ending_rocket_x
+	var ry: float = game_state.ending_rocket_y
+	var fc: int = game_state.ending_frame_counter
+
+	if reg != null and reg.has_method("get_ending_texture"):
+		var tex: ImageTexture = reg.get_ending_texture(tier)
 		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
 			draw_texture(tex, Vector2.ZERO)
 		else:
@@ -330,40 +440,8 @@ func _draw_ending_animation() -> void:
 	else:
 		draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), Color("#000033"))
 
-	if game_state == null:
-		return
-
-	var rx: float = game_state.ending_rocket_x
-	var ry: float = game_state.ending_rocket_y
-	var tier: int = game_state.ending_tier
-	var fc: int = game_state.ending_frame_counter
-
-	# Render rocket body based on score tier
-	var rocket_color: Color = COLOR_WHITE
-	match tier:
-		Constants.RocketTier.TIER_0_SMALL:
-			draw_rect(Rect2(rx, ry, 8.0, 16.0), rocket_color)
-			draw_rect(Rect2(rx + 2.0, ry - 4.0, 4.0, 4.0), COLOR_TEXT_RED)
-		Constants.RocketTier.TIER_1_MEDIUM_SMALL:
-			draw_rect(Rect2(rx - 4.0, ry, 16.0, 24.0), rocket_color)
-			draw_rect(Rect2(rx, ry - 6.0, 8.0, 6.0), COLOR_TEXT_RED)
-		Constants.RocketTier.TIER_2_MEDIUM:
-			draw_rect(Rect2(rx - 8.0, ry, 24.0, 32.0), rocket_color)
-			draw_rect(Rect2(rx - 4.0, ry - 8.0, 16.0, 8.0), COLOR_TEXT_RED)
-		Constants.RocketTier.TIER_3_LARGE:
-			draw_rect(Rect2(rx - 12.0, ry, 32.0, 48.0), rocket_color)
-			draw_rect(Rect2(rx - 6.0, ry - 10.0, 20.0, 10.0), COLOR_TEXT_RED)
-		Constants.RocketTier.TIER_4_CATHEDRAL:
-			draw_rect(Rect2(rx - 24.0, ry, 56.0, 64.0), Color("#CC3333"))
-			draw_rect(Rect2(rx - 16.0, ry - 16.0, 40.0, 16.0), Color("#FFD700"))
-
-	# Render animated thruster jet flames during liftoff
-	if fc >= Constants.ROCKET_LAUNCH_DELAY_FRAMES and ry > -20.0:
-		var flame_toggle: bool = (fc & 0x02) != 0
-		var flame_height: float = 12.0 if flame_toggle else 8.0
-		var flame_color: Color = Color(1.0, 0.6, 0.1, 1.0)
-		draw_rect(Rect2(rx + 1.0, ry + 16.0, 6.0, flame_height), flame_color)
-		draw_rect(Rect2(rx + 2.0, ry + 16.0 + flame_height, 4.0, 4.0), Color(1.0, 0.2, 0.0, 1.0))
+	if reg != null and reg.has_method("draw_ending_rocket"):
+		reg.draw_ending_rocket(self, tier, Vector2(rx, ry), fc)
 
 func _draw_rom_setup_screen() -> void:
 	draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
@@ -380,7 +458,13 @@ func _draw_rom_setup_screen() -> void:
 	_draw_text("Then restart the game.", Vector2(44, 205), COLOR_BORDER_ACCENT)
 
 func _draw_background() -> void:
-	# 256x240 dark canvas background
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	var g_type: int = game_state.current_game_type if game_state != null else 0
+	if reg != null and reg.has_method("get_game_background_texture"):
+		var tex: ImageTexture = reg.get_game_background_texture(g_type)
+		if tex != null and tex.get_size() == Vector2(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT):
+			draw_texture(tex, Vector2.ZERO)
+			return
 	draw_rect(Rect2(0, 0, Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT), COLOR_BLACK)
 
 func _draw_playfield_frame() -> void:
@@ -392,16 +476,15 @@ func _draw_playfield_frame() -> void:
 	# Inner Playfield Black Background
 	draw_rect(Rect2(pf_x, pf_y, pf_w, pf_h), COLOR_BLACK)
 
-	# NES Bevel Borders around Playfield (Left, Right, Bottom)
-	# Left border (2px wide)
-	draw_line(Vector2(pf_x - 2, pf_y - 1), Vector2(pf_x - 2, pf_y + pf_h + 2), COLOR_BORDER_FRAME, 1.0)
-	draw_line(Vector2(pf_x - 1, pf_y - 1), Vector2(pf_x - 1, pf_y + pf_h + 1), COLOR_BORDER_ACCENT, 1.0)
-	# Right border (2px wide)
-	draw_line(Vector2(pf_x + pf_w, pf_y - 1), Vector2(pf_x + pf_w, pf_y + pf_h + 1), COLOR_BORDER_ACCENT, 1.0)
-	draw_line(Vector2(pf_x + pf_w + 1, pf_y - 1), Vector2(pf_x + pf_w + 1, pf_y + pf_h + 2), COLOR_BORDER_FRAME, 1.0)
-	# Bottom border (2px high)
-	draw_line(Vector2(pf_x - 2, pf_y + pf_h), Vector2(pf_x + pf_w + 2, pf_y + pf_h), COLOR_BORDER_ACCENT, 1.0)
-	draw_line(Vector2(pf_x - 2, pf_y + pf_h + 1), Vector2(pf_x + pf_w + 2, pf_y + pf_h + 1), COLOR_BORDER_FRAME, 1.0)
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg == null or not reg.get("is_initialized"):
+		# NES Bevel Borders around Playfield (Left, Right, Bottom) for fallback
+		draw_line(Vector2(pf_x - 2, pf_y - 1), Vector2(pf_x - 2, pf_y + pf_h + 2), COLOR_BORDER_FRAME, 1.0)
+		draw_line(Vector2(pf_x - 1, pf_y - 1), Vector2(pf_x - 1, pf_y + pf_h + 1), COLOR_BORDER_ACCENT, 1.0)
+		draw_line(Vector2(pf_x + pf_w, pf_y - 1), Vector2(pf_x + pf_w, pf_y + pf_h + 1), COLOR_BORDER_ACCENT, 1.0)
+		draw_line(Vector2(pf_x + pf_w + 1, pf_y - 1), Vector2(pf_x + pf_w + 1, pf_y + pf_h + 2), COLOR_BORDER_FRAME, 1.0)
+		draw_line(Vector2(pf_x - 2, pf_y + pf_h), Vector2(pf_x + pf_w + 2, pf_y + pf_h), COLOR_BORDER_ACCENT, 1.0)
+		draw_line(Vector2(pf_x - 2, pf_y + pf_h + 1), Vector2(pf_x + pf_w + 2, pf_y + pf_h + 1), COLOR_BORDER_FRAME, 1.0)
 
 func _draw_playfield_matrix() -> void:
 	var grid: BoardGrid = null
@@ -423,7 +506,6 @@ func _draw_playfield_matrix() -> void:
 					if tex != null:
 						draw_texture(tex, screen_pos)
 				else:
-					# Simple fallback rectangle if ContentRegistry not ready
 					var col_fallback: Color = COLOR_WHITE if tile_type == 1 else COLOR_BORDER_ACCENT
 					draw_rect(Rect2(screen_pos.x, screen_pos.y, 8, 8), col_fallback)
 
@@ -458,17 +540,15 @@ func _draw_preview_box() -> void:
 	var box_w: float = 32.0
 	var box_h: float = 32.0
 
-	# Preview box background & border
-	draw_rect(Rect2(box_x, box_y, box_w, box_h), COLOR_BLACK)
-	draw_rect(Rect2(box_x, box_y, box_w, box_h), COLOR_BORDER_ACCENT, false, 1.0)
-
-	# Label "NEXT" above preview box
-	_draw_text("NEXT", Vector2(box_x + 4, box_y - 4), COLOR_WHITE)
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg == null or not reg.get("is_initialized"):
+		draw_rect(Rect2(box_x, box_y, box_w, box_h), COLOR_BLACK)
+		draw_rect(Rect2(box_x, box_y, box_w, box_h), COLOR_BORDER_ACCENT, false, 1.0)
+		_draw_text("NEXT", Vector2(box_x + 4, box_y - 4), COLOR_WHITE)
 
 	if next_piece_type < 0 or next_piece_type >= Constants.PIECE_COUNT:
 		return
 
-	var reg: Node = get_node_or_null("/root/ContentRegistry")
 	var spawn_ori: int = Constants.SPAWN_ORIENTATIONS[next_piece_type]
 	var tile_type: int = Constants.TILE_TYPE_FROM_PIECE[next_piece_type]
 	var anchor: Vector2 = get_preview_anchor(next_piece_type)
@@ -489,32 +569,45 @@ func _draw_preview_box() -> void:
 			draw_rect(Rect2(pos.x, pos.y, 8, 8), COLOR_WHITE)
 
 func _draw_hud() -> void:
-	# 1. Lines counter (Top Center: X: 152, Y: 16)
-	_draw_text("LINES", Vector2(152, 16), COLOR_WHITE)
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	var is_init: bool = (reg != null and reg.get("is_initialized"))
+
+	# Fallback static labels: ONLY drawn if extracted background nametable is missing
+	if not is_init:
+		_draw_text("LINES", Vector2(152, 16), COLOR_WHITE)
+		_draw_text("TOP", Vector2(192, 32), COLOR_WHITE)
+		_draw_text("SCORE", Vector2(192, 56), COLOR_WHITE)
+		_draw_text("LEVEL", Vector2(208, 160), COLOR_WHITE)
+		_draw_text("STATISTICS", Vector2(16, 80), COLOR_TEXT_RED)
+		var piece_labels: Array[String] = ["T", "J", "Z", "O", "S", "L", "I"]
+		for i in range(Constants.PIECE_COUNT):
+			_draw_text(piece_labels[i], Vector2(24, 96.0 + float(i * 16)), COLOR_TEXT_RED)
+
+	# 1. Lines counter (Top Center: PPU $2073 -> Row 3, Col 19: X: 152, Y: 24)
 	if game_state != null and game_state.current_game_type == Constants.GameType.TYPE_B:
-		_draw_text("%02d" % game_state.score_mgr.lines_remaining, Vector2(160, 26), COLOR_WHITE)
+		draw_rect(Rect2(160.0, 24.0, 16.0, 8.0), COLOR_BLACK)
+		_draw_nes_text("%02d" % game_state.score_mgr.lines_remaining, Vector2(160, 24), COLOR_WHITE)
 	else:
-		_draw_text("%03d" % current_lines, Vector2(160, 26), COLOR_WHITE)
+		draw_rect(Rect2(152.0, 24.0, 24.0, 8.0), COLOR_BLACK)
+		_draw_nes_text("%03d" % current_lines, Vector2(152, 24), COLOR_WHITE)
 
-	# 2. Top Score (Upper Right: X: 192, Y: 32)
-	_draw_text("TOP", Vector2(192, 32), COLOR_WHITE)
-	_draw_text("%06d" % top_score, Vector2(192, 42), COLOR_WHITE)
+	# 2. Top Score (Upper Right: PPU $20B8 -> Row 5, Col 24: X: 192, Y: 40)
+	draw_rect(Rect2(192.0, 40.0, 48.0, 8.0), COLOR_BLACK)
+	_draw_nes_text("%06d" % top_score, Vector2(192, 40), COLOR_WHITE)
 
-	# 3. Score (Right Sidebar: X: 192, Y: 56)
-	_draw_text("SCORE", Vector2(192, 56), COLOR_WHITE)
-	_draw_text("%06d" % current_score, Vector2(192, 66), COLOR_WHITE)
+	# 3. Score (Right Sidebar: PPU $2118 -> Row 8, Col 24: X: 192, Y: 64)
+	draw_rect(Rect2(192.0, 64.0, 48.0, 8.0), COLOR_BLACK)
+	_draw_nes_text("%06d" % current_score, Vector2(192, 64), COLOR_WHITE)
 
-	# 4. Level (Lower Right: X: 208, Y: 160)
-	_draw_text("LEVEL", Vector2(208, 160), COLOR_WHITE)
-	_draw_text("%02d" % current_level, Vector2(216, 172), COLOR_WHITE)
+	# 4. Level (Lower Right: PPU $22BA -> Row 21, Col 26: X: 208, Y: 168)
+	draw_rect(Rect2(208.0, 168.0, 16.0, 8.0), COLOR_BLACK)
+	_draw_nes_text("%02d" % current_level, Vector2(208, 168), COLOR_WHITE)
 
-	# 5. Statistics (Left Sidebar: X: 16 to 80, Y: 80 to 200)
-	_draw_text("STATISTICS", Vector2(16, 80), COLOR_TEXT_RED)
-	var piece_labels: Array[String] = ["T", "J", "Z", "O", "S", "L", "I"]
+	# 5. Statistics (Left Sidebar: Rows 12, 14, 16, 18, 20, 22, 24, Col 6: X: 48, Y: 96 + i * 16)
 	for i in range(Constants.PIECE_COUNT):
-		var y_pos: float = 98.0 + float(i * 14)
-		_draw_text(piece_labels[i], Vector2(24, y_pos), COLOR_TEXT_RED)
-		_draw_text("%03d" % piece_stats[i], Vector2(48, y_pos), COLOR_WHITE)
+		var y_pos: float = 96.0 + float(i * 16)
+		draw_rect(Rect2(48.0, y_pos, 24.0, 8.0), COLOR_BLACK)
+		_draw_nes_text("%03d" % piece_stats[i], Vector2(48, y_pos), COLOR_TEXT_RED)
 
 func _draw_game_over_banner() -> void:
 	var pf_x: float = float(Constants.PLAYFIELD_OFFSET_X)
@@ -523,8 +616,24 @@ func _draw_game_over_banner() -> void:
 	var banner_rect: Rect2 = Rect2(pf_x + 4, pf_y + 70, 72, 24)
 	draw_rect(banner_rect, COLOR_BLACK)
 	draw_rect(banner_rect, COLOR_TEXT_RED, false, 1.0)
-	_draw_text("GAME", Vector2(pf_x + 24, pf_y + 80), COLOR_WHITE)
-	_draw_text("OVER", Vector2(pf_x + 24, pf_y + 90), COLOR_WHITE)
+	_draw_nes_text("GAME", Vector2(pf_x + 24, pf_y + 74), COLOR_WHITE)
+	_draw_nes_text("OVER", Vector2(pf_x + 24, pf_y + 84), COLOR_WHITE)
+
+func _draw_nes_text(text: String, pos: Vector2, color: Color = COLOR_WHITE) -> void:
+	var reg: Node = get_node_or_null("/root/ContentRegistry")
+	if reg != null and reg.get("is_initialized"):
+		var cur_x: float = pos.x
+		var u_text: String = text.to_upper()
+		for i in range(u_text.length()):
+			var ch: String = u_text[i]
+			var tex: Texture2D = reg.get_font_glyph(ch)
+			if tex != null:
+				draw_texture(tex, Vector2(cur_x, pos.y), color)
+			elif ch != " ":
+				_draw_text(ch, Vector2(cur_x, pos.y + 7.0), color)
+			cur_x += 8.0
+	else:
+		_draw_text(text, Vector2(pos.x, pos.y + 7.0), color)
 
 func _draw_text(text: String, pos: Vector2, color: Color) -> void:
 	if _hud_font == null:
@@ -542,14 +651,13 @@ static func grid_to_screen(grid_pos: Vector2i) -> Vector2:
 
 ## Calculates authentic preview box mino anchor coordinate for a tetromino piece type.
 static func get_preview_anchor(piece_type: int) -> Vector2:
-	var origin: Vector2 = Vector2(float(Constants.PREVIEW_OFFSET_X), float(Constants.PREVIEW_OFFSET_Y))
 	match piece_type:
 		Constants.PieceType.O:
-			return origin + Vector2(20.0, 12.0)
+			return Vector2(208.0, 120.0)
 		Constants.PieceType.I:
-			return origin + Vector2(20.0, 16.0)
+			return Vector2(208.0, 124.0)
 		_:
-			return origin + Vector2(16.0, 12.0)
+			return Vector2(204.0, 120.0)
 
 # --- EventBus Handlers ---
 
@@ -581,8 +689,6 @@ func _on_lines_cleared(_count: int, _rows: Array[int]) -> void:
 
 func _on_score_updated(new_score: int, _points_added: int) -> void:
 	current_score = new_score
-	if current_score > top_score:
-		top_score = current_score
 	queue_redraw()
 
 func _on_lines_updated(new_lines: int) -> void:
@@ -595,6 +701,7 @@ func _on_level_updated(new_level: int) -> void:
 
 func _on_game_over() -> void:
 	is_game_over = true
+	refresh_top_score()
 	queue_redraw()
 
 func _on_game_restarted() -> void:
@@ -605,4 +712,5 @@ func _on_game_restarted() -> void:
 	clearing_step = -1
 	for i in range(piece_stats.size()):
 		piece_stats[i] = 0
+	refresh_top_score()
 	queue_redraw()

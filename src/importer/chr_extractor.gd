@@ -35,16 +35,26 @@ const MUSIC_VOL_TABLE_ROM_OFFSET: int = 0x006A5A # CPU $EA4A (44 bytes: 22 16-bi
 const NOISES_TABLE_ROM_OFFSET: int = 0x0065BB    # CPU $E5AB (37 bytes: noise triples)
 const DEMO_BUTTONS_ROM_OFFSET: int = 0x005D10    # CPU $DD00 (512 bytes: input recording)
 const DEMO_TETRIMINO_TYPE_ROM_OFFSET: int = 0x005F10 # CPU $DF00 (256 bytes: piece types)
-const MENU_PALETTE_ROM_OFFSET: int = 0x002D3B       # CPU $9731 (20 bytes + header)
-const TITLE_NAMETABLE_ROM_OFFSET: int = 0x003229     # CPU $B219 (title screen compressed stream)
-const GAME_TYPE_NAMETABLE_ROM_OFFSET: int = 0x00368A  # CPU $B67A (game type menu compressed stream)
-const LEVEL_MENU_NAMETABLE_ROM_OFFSET: int = 0x003AEB # CPU $BADA (level menu compressed stream)
-const HEIGHT_PATCH_ROM_OFFSET: int = 0x00496D        # CPU $C95D (Type A height blanking patch)
-const HIGH_SCORE_NAMETABLE_ROM_OFFSET: int = 0x003D3E # CPU $BD2E (high score screen compressed stream)
-const ENTER_HIGH_SCORE_NAMETABLE_ROM_OFFSET: int = 0x0043AD # CPU $C39D (enter high score compressed stream)
-const TYPE_A_ENDING_NAMETABLE_ROM_OFFSET: int = 0x004E17 # CPU $CE07 (ending screen compressed stream)
-const ENDING_PALETTE_ROM_OFFSET: int = 0x002D53       # CPU $9749 (ending palette 32 bytes + header)
 const DEFAULT_HIGH_SCORES_ROM_OFFSET: int = 0x002D77   # CPU $976D (default high score table)
+
+# --- Verified Authentic PPU Palettes & Nametables (File Offsets) ---
+const GAME_PALETTE_ROM_OFFSET: int = 0x002D03      # CPU $ACF3 (32 bytes + header)
+const LEGAL_PALETTE_ROM_OFFSET: int = 0x002D27     # CPU $AD17 (16 bytes + header)
+const MENU_PALETTE_ROM_OFFSET: int = 0x002D3B       # CPU $AD2B (20 bytes + header)
+const ENDING_PALETTE_ROM_OFFSET: int = 0x002D53     # CPU $AD43 (32 bytes + header)
+const LEGAL_NAMETABLE_ROM_OFFSET: int = 0x002DC8   # CPU $ADB8 (legal screen nametable)
+const TITLE_NAMETABLE_ROM_OFFSET: int = 0x003229   # CPU $B219 (title screen compressed stream)
+const GAME_TYPE_NAMETABLE_ROM_OFFSET: int = 0x00368A # CPU $B67A (game type menu compressed stream)
+const LEVEL_MENU_NAMETABLE_ROM_OFFSET: int = 0x003AEB # CPU $BADB (level menu compressed stream)
+const GAME_NAMETABLE_ROM_OFFSET: int = 0x003F4C    # CPU $BF3C (in-game HUD & playfield nametable)
+const ENTER_HIGH_SCORE_NAMETABLE_ROM_OFFSET: int = 0x0043AD # CPU $C39D (enter high score compressed stream)
+const HIGH_SCORE_NAMETABLE_ROM_OFFSET: int = 0x00480E # CPU $C7FE (high scores nametable patch)
+const HEIGHT_PATCH_ROM_OFFSET: int = 0x00496D      # CPU $C95D (Type A height blanking patch)
+const TYPE_B_LVL9_ENDING_NAMETABLE_ROM_OFFSET: int = 0x0049B6 # CPU $C9A6 (Type B level 9 castle ending)
+const TYPE_B_ENDING_NAMETABLE_ROM_OFFSET: int = 0x004E17 # CPU $CE07 (Type B ending nametable)
+const TYPE_A_ENDING_NAMETABLE_ROM_OFFSET: int = 0x005278 # CPU $D268 (Type A rocket ending nametable)
+const TYPE_A_120K_PATCH_ROM_OFFSET: int = 0x0028DC # CPU $A8CC (Cathedral launchpad erase patch)
+const GAME_TYPEB_PATCH_ROM_OFFSET: int = 0x0006C0  # CPU $86B0 (Game Type B HUD patch)
 
 # --- CHR Bank Offsets & Game Tile Indices ---
 const CHR_BANK_0_TITLE: int = 0
@@ -56,6 +66,28 @@ const TILE_PRIMARY_INDEX: int = 0x7B   # Tile 1: Bevelled frame block
 const TILE_SECONDARY_INDEX: int = 0x7C # Tile 2: Gem / specular block
 const TILE_TERTIARY_INDEX: int = 0x7D  # Tile 3: Primary with highlight
 const TILE_CURTAIN_INDEX: int = 0x4F   # Curtain wipe block
+
+# Authentic 16x16 tile-aligned puzzle cluster (128x128 pixels)
+# Composed exclusively of authentic interlocking NES Tetris border tiles from CHR Bank 3 (0x66-0x89)
+# Wraps modulo-16 on both X and Y axes with ZERO seam errors, zero mirrored columns, and zero cut edges.
+const WIDESCREEN_PUZZLE_CLUSTER_16X16: Array[Array] = [
+	[0x78, 0x79, 0x7A, 0x67, 0x78, 0x79, 0x7A, 0x78, 0x7A, 0x78, 0x79, 0x79, 0x7A, 0x78, 0x7A, 0x67],
+	[0x78, 0x79, 0x7A, 0x87, 0x78, 0x7A, 0x78, 0x7A, 0x78, 0x79, 0x7A, 0x67, 0x78, 0x7A, 0x67, 0x87],
+	[0x67, 0x67, 0x67, 0x78, 0x79, 0x79, 0x7A, 0x67, 0x78, 0x79, 0x7A, 0x77, 0x67, 0x67, 0x77, 0x67],
+	[0x77, 0x77, 0x77, 0x70, 0x71, 0x78, 0x7A, 0x77, 0x67, 0x67, 0x67, 0x77, 0x77, 0x77, 0x87, 0x77],
+	[0x87, 0x77, 0x87, 0x80, 0x81, 0x70, 0x71, 0x77, 0x87, 0x87, 0x77, 0x87, 0x87, 0x87, 0x67, 0x87],
+	[0x67, 0x87, 0x78, 0x7A, 0x67, 0x80, 0x81, 0x87, 0x78, 0x7A, 0x87, 0x67, 0x78, 0x7A, 0x77, 0x67],
+	[0x87, 0x67, 0x70, 0x71, 0x77, 0x70, 0x71, 0x78, 0x79, 0x79, 0x7A, 0x87, 0x67, 0x67, 0x87, 0x77],
+	[0x67, 0x87, 0x80, 0x81, 0x87, 0x80, 0x81, 0x78, 0x79, 0x7A, 0x78, 0x7A, 0x77, 0x77, 0x67, 0x77],
+	[0x77, 0x78, 0x79, 0x79, 0x7A, 0x78, 0x79, 0x7A, 0x70, 0x71, 0x67, 0x67, 0x77, 0x87, 0x77, 0x87],
+	[0x77, 0x78, 0x7A, 0x67, 0x67, 0x78, 0x79, 0x7A, 0x80, 0x81, 0x77, 0x87, 0x87, 0x67, 0x77, 0x67],
+	[0x87, 0x67, 0x67, 0x87, 0x77, 0x67, 0x78, 0x79, 0x79, 0x7A, 0x87, 0x67, 0x67, 0x77, 0x87, 0x77],
+	[0x67, 0x77, 0x77, 0x67, 0x87, 0x77, 0x70, 0x71, 0x70, 0x71, 0x67, 0x77, 0x87, 0x77, 0x67, 0x77],
+	[0x87, 0x87, 0x77, 0x77, 0x67, 0x77, 0x80, 0x81, 0x80, 0x81, 0x87, 0x77, 0x67, 0x87, 0x77, 0x87],
+	[0x78, 0x7A, 0x87, 0x77, 0x87, 0x87, 0x78, 0x7A, 0x78, 0x7A, 0x67, 0x87, 0x77, 0x67, 0x87, 0x67],
+	[0x70, 0x71, 0x67, 0x87, 0x78, 0x7A, 0x78, 0x79, 0x7A, 0x67, 0x77, 0x67, 0x87, 0x87, 0x67, 0x77],
+	[0x80, 0x81, 0x87, 0x78, 0x79, 0x79, 0x7A, 0x78, 0x7A, 0x87, 0x87, 0x87, 0x78, 0x7A, 0x87, 0x87],
+]
 
 # --- Cryptographic Helpers ---
 
@@ -259,11 +291,37 @@ static func decode_bcd_score(b0: int, b1: int, b2: int) -> int:
 	var s2: int = ((b2 >> 4) * 10) + (b2 & 0x0F)
 	return s0 + s1 + s2
 
+## Applies an uncompressed PPU patch stream (hi, lo, values..., FE=next_record, FD=end).
+static func apply_ppu_patch(ppu: PackedByteArray, patch: PackedByteArray) -> void:
+	var pos: int = 0
+	while pos < patch.size():
+		if patch[pos] == 0xFD:
+			break
+		if pos + 1 >= patch.size():
+			break
+		var hi: int = patch[pos]
+		var lo: int = patch[pos + 1]
+		var addr: int = (hi << 8) | lo
+		pos += 2
+		while pos < patch.size():
+			var v: int = patch[pos]
+			pos += 1
+			if v == 0xFE:
+				break
+			if v == 0xFD:
+				pos -= 1
+				break
+			if addr < ppu.size():
+				ppu[addr] = v
+			addr += 1
+
 ## Renders a 1024-byte authentic NES nametable (960 tile IDs + 64 attributes)
-## into a 256x240 Image using 2bpp tiles from CHR Bank 0 and authentic menu palette.
-static func render_nametable_image(nametable: PackedByteArray, chr_bank_0: PackedByteArray, palette_bytes: PackedByteArray) -> Image:
+## into a 256x240 Image using 2bpp tiles from a specified CHR bank and authentic palette.
+static func render_nametable_image(nametable: PackedByteArray, chr_bank: PackedByteArray, palette_bytes: PackedByteArray) -> Image:
 	var img: Image = Image.create(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT, false, Image.FORMAT_RGBA8)
-	img.fill(Color.BLACK)
+	var universal_bg_idx: int = palette_bytes[0] if palette_bytes.size() > 0 else 0x0F
+	var universal_bg: Color = Constants.NES_MASTER_PALETTE[universal_bg_idx]
+	img.fill(universal_bg)
 
 	var bg_palettes: Array[Array] = []
 	for p in range(4):
@@ -275,7 +333,7 @@ static func render_nametable_image(nametable: PackedByteArray, chr_bank_0: Packe
 
 	var tiles_pixels: Array[PackedByteArray] = []
 	for t in range(256):
-		var tile_data: PackedByteArray = chr_bank_0.slice(t * 16, (t + 1) * 16)
+		var tile_data: PackedByteArray = chr_bank.slice(t * 16, (t + 1) * 16)
 		tiles_pixels.append(decode_tile_2bpp(tile_data))
 
 	for r in range(30):
@@ -298,9 +356,135 @@ static func render_nametable_image(nametable: PackedByteArray, chr_bank_0: Packe
 			for py in range(8):
 				for px in range(8):
 					var col_val: int = pixels[py * 8 + px]
-					img.set_pixel(origin_x + px, origin_y + py, pal[col_val])
+					if col_val == 0:
+						img.set_pixel(origin_x + px, origin_y + py, universal_bg)
+					else:
+						img.set_pixel(origin_x + px, origin_y + py, pal[col_val])
 
 	return img
+
+# --- Authentic 1989 NES Tetris Rocket OAM Sprite Definitions ---
+# Each entry: array of [rel_y, tile_id, attr, rel_x]
+# attr: bits 0-1 = pal_idx, bit 6 = flip_h, bit 7 = flip_v
+const ROCKET_DEFINITIONS: Array[Dictionary] = [
+	# Tier 0: Small Rocket (sprite3E, jet1=sprite3F, jet2=sprite40)
+	{
+		"body": [[0, 0xA6, 0x23, 0]],
+		"jet_1": [[8, 0xA7, 0x23, 0]],
+		"jet_2": [[8, 0xF4, 0x23, 0]],
+	},
+	# Tier 1: Medium-Small Rocket (sprite41, jet1=sprite42, jet2=sprite43)
+	{
+		"body": [[-8, 0xB4, 0x21, 0], [0, 0xC4, 0x21, 0]],
+		"jet_1": [[8, 0xD4, 0x23, 0]],
+		"jet_2": [[8, 0xE4, 0x23, 0]],
+	},
+	# Tier 2: Medium Rocket (sprite44, jet1=sprite45, jet2=sprite46)
+	{
+		"body": [
+			[-24, 0xB5, 0x23, 0], [-24, 0xB6, 0x23, 8],
+			[-16, 0xC5, 0x23, 0], [-16, 0xC6, 0x23, 8],
+			[-8, 0xD5, 0x23, 0], [-8, 0xD6, 0x23, 8],
+			[0, 0xE5, 0x23, 0], [0, 0xE6, 0x23, 8],
+		],
+		"jet_1": [[8, 0xF5, 0x23, 0], [8, 0xF6, 0x23, 8]],
+		"jet_2": [[8, 0xB7, 0x23, 0], [8, 0xB8, 0x23, 8]],
+	},
+	# Tier 3: Large Buran Rocket (sprite47, jet1=sprite48, jet2=sprite49)
+	{
+		"body": [
+			[-48, 0xC2, 0x21, 8], [-48, 0xC3, 0x21, 16],
+			[-40, 0xCB, 0x21, 8], [-40, 0xEB, 0x21, 16],
+			[-32, 0xDB, 0x21, 8], [-32, 0xFB, 0x21, 16],
+			[-24, 0xC7, 0x21, 0], [-24, 0xC8, 0x21, 8], [-24, 0xC9, 0x21, 16], [-24, 0xCA, 0x21, 24],
+			[-16, 0xD7, 0x21, 0], [-16, 0xD8, 0x21, 8], [-16, 0xD9, 0x21, 16], [-16, 0xDA, 0x21, 24],
+			[-8, 0xE7, 0x21, 0], [-8, 0xE8, 0x21, 8], [-8, 0xE9, 0x21, 16], [-8, 0xEA, 0x21, 24],
+			[0, 0xF7, 0x21, 0], [0, 0xF8, 0x21, 8], [0, 0xF9, 0x21, 16], [0, 0xFA, 0x21, 24],
+		],
+		"jet_1": [[8, 0x2A, 0x23, 8], [8, 0x2B, 0x23, 16]],
+		"jet_2": [[8, 0x2C, 0x23, 8], [8, 0x2D, 0x23, 16], [16, 0x2E, 0x23, 8], [16, 0x2F, 0x23, 16]],
+	},
+	# Tier 4: Saint Basil's Cathedral Rocket (sprite4A, jet1=sprite23, jet2=sprite24)
+	{
+		"body": [
+			[-56, 0x38, 0x23, 32],
+			[-48, 0x39, 0x23, 8], [-48, 0x3B, 0x23, 24], [-48, 0x3C, 0x23, 32], [-48, 0x3E, 0x23, 48], [-48, 0x3F, 0x23, 56],
+			[-40, 0x48, 0x23, 0], [-40, 0x49, 0x23, 8], [-40, 0x4A, 0x23, 16], [-40, 0x4B, 0x23, 24], [-40, 0x4C, 0x23, 32], [-40, 0x4D, 0x23, 40], [-40, 0x4E, 0x20, 48], [-40, 0x4F, 0x20, 56],
+			[-32, 0x58, 0x23, 0], [-32, 0x59, 0x23, 8], [-32, 0x5A, 0x23, 16], [-32, 0x5B, 0x23, 24], [-32, 0x5C, 0x23, 32], [-32, 0x5D, 0x23, 40], [-32, 0x5E, 0x20, 48], [-32, 0x5F, 0x20, 56],
+			[-24, 0x68, 0x23, 0], [-24, 0x69, 0x23, 8], [-24, 0x6A, 0x23, 16], [-24, 0x6B, 0x23, 24], [-24, 0x6C, 0x23, 32], [-24, 0x6D, 0x23, 40], [-24, 0x6E, 0x23, 48], [-24, 0x6F, 0x23, 56],
+			[-16, 0x78, 0x23, 0], [-16, 0x79, 0x23, 8], [-16, 0x7A, 0x23, 16], [-16, 0x7B, 0x23, 24], [-16, 0x7C, 0x23, 32], [-16, 0x7D, 0x23, 40], [-16, 0x7E, 0x23, 48], [-16, 0x7F, 0x23, 56],
+			[-8, 0x88, 0x20, 0], [-8, 0x89, 0x20, 8], [-8, 0x8A, 0x20, 16], [-8, 0x8B, 0x20, 24], [-8, 0x8C, 0x20, 32], [-8, 0x8D, 0x20, 40], [-8, 0x8E, 0x20, 48], [-8, 0x8F, 0x20, 56],
+			[0, 0x98, 0x20, 0], [0, 0x99, 0x20, 8], [0, 0x9A, 0x20, 16], [0, 0x9B, 0x20, 24], [0, 0x9C, 0x20, 32], [0, 0x9D, 0x20, 40], [0, 0x9E, 0x20, 48], [0, 0x9F, 0x20, 56],
+		],
+		"jet_1": [[8, 0xA8, 0x23, 24], [8, 0xA9, 0x23, 32]],
+		"jet_2": [
+			[8, 0xAA, 0x23, 16], [8, 0xAB, 0x23, 24], [8, 0xAC, 0x23, 32], [8, 0xAD, 0x23, 40],
+			[16, 0xBA, 0x23, 16], [16, 0xBB, 0x23, 24],
+		],
+	},
+]
+
+## Pre-renders an array of OAM sprite definitions [rel_y, tile_id, attr, rel_x] into an ImageTexture.
+static func render_sprite_group_image(chr_bank: PackedByteArray, sprite_defs: Array, sprite_palettes: PackedByteArray) -> Dictionary:
+	if sprite_defs.is_empty():
+		var empty_tex: ImageTexture = ImageTexture.create_from_image(Image.create(8, 8, false, Image.FORMAT_RGBA8))
+		return {"texture": empty_tex, "offset": Vector2.ZERO}
+
+	var min_x: int = 999
+	var max_x: int = -999
+	var min_y: int = 999
+	var max_y: int = -999
+	for s in sprite_defs:
+		var sy: int = int(s[0])
+		var sx: int = int(s[3])
+		min_x = mini(min_x, sx)
+		max_x = maxi(max_x, sx + 8)
+		min_y = mini(min_y, sy)
+		max_y = maxi(max_y, sy + 8)
+
+	var w: int = maxi(1, max_x - min_x)
+	var h: int = maxi(1, max_y - min_y)
+	var img: Image = Image.create(w, h, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0)) # Sprites are transparent by default
+
+	# Parse 4 sprite palettes (4 colors each: index 0 transparent, indices 1..3 from NES_MASTER_PALETTE)
+	var s_palettes: Array[Array] = []
+	for p in range(4):
+		var pal: Array[Color] = [Color(0, 0, 0, 0)]
+		for c in range(1, 4):
+			var idx: int = sprite_palettes[p * 4 + c] if (p * 4 + c) < sprite_palettes.size() else 0x0F
+			pal.append(Constants.NES_MASTER_PALETTE[idx])
+		s_palettes.append(pal)
+
+	for s in sprite_defs:
+		var rel_y: int = int(s[0])
+		var tile_id: int = int(s[1])
+		var attr: int = int(s[2])
+		var rel_x: int = int(s[3])
+
+		var tile_offset: int = tile_id * 16
+		var pixels: PackedByteArray = decode_tile_2bpp(chr_bank, tile_offset)
+		var flip_h: bool = (attr & 0x40) != 0
+		var flip_v: bool = (attr & 0x80) != 0
+		var pal_idx: int = attr & 0x03
+		var pal: Array[Color] = s_palettes[pal_idx]
+
+		var dest_origin_x: int = rel_x - min_x
+		var dest_origin_y: int = rel_y - min_y
+
+		for py in range(8):
+			var src_y: int = (7 - py) if flip_v else py
+			for px in range(8):
+				var src_x: int = (7 - px) if flip_h else px
+				var col_val: int = pixels[src_y * 8 + src_x]
+				if col_val != 0:
+					var dx: int = dest_origin_x + px
+					var dy: int = dest_origin_y + py
+					if dx >= 0 and dx < w and dy >= 0 and dy < h:
+						img.set_pixel(dx, dy, pal[col_val])
+
+	var tex: ImageTexture = ImageTexture.create_from_image(img)
+	return {"texture": tex, "offset": Vector2(float(min_x), float(min_y))}
 
 # --- Comprehensive 100% Extraction Pipeline ---
 
@@ -412,12 +596,19 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	result["level_textures"] = level_textures
 
 	# 9. Extract PRG-ROM Menu Palettes & Nametables
+	var game_palette: PackedByteArray = rom_bytes.slice(GAME_PALETTE_ROM_OFFSET + 3, GAME_PALETTE_ROM_OFFSET + 35)
+	result["game_palette"] = game_palette
+
+	var legal_palette: PackedByteArray = rom_bytes.slice(LEGAL_PALETTE_ROM_OFFSET + 3, LEGAL_PALETTE_ROM_OFFSET + 19)
+	result["legal_palette"] = legal_palette
+
 	var menu_palette: PackedByteArray = rom_bytes.slice(MENU_PALETTE_ROM_OFFSET + 3, MENU_PALETTE_ROM_OFFSET + 23)
 	result["menu_palette"] = menu_palette
 
 	var ending_palette: PackedByteArray = rom_bytes.slice(ENDING_PALETTE_ROM_OFFSET + 3, ENDING_PALETTE_ROM_OFFSET + 35)
 	result["ending_palette"] = ending_palette
 
+	# Authentic Nametable Streams Decoding
 	var ppu_title: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TITLE_NAMETABLE_ROM_OFFSET))
 	var nt_title: PackedByteArray = ppu_title.slice(0x2000, 0x2400)
 	result["title_nametable"] = nt_title
@@ -426,34 +617,94 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	var nt_type: PackedByteArray = ppu_type.slice(0x2000, 0x2400)
 	result["game_type_nametable"] = nt_type
 
+	# Level Menu B: level menu stream + high scores table overlay
 	var ppu_lvl_b: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(LEVEL_MENU_NAMETABLE_ROM_OFFSET))
+	ppu_lvl_b = decode_ppu_nametable_stream(rom_bytes.slice(HIGH_SCORE_NAMETABLE_ROM_OFFSET), ppu_lvl_b)
 	var nt_lvl_b: PackedByteArray = ppu_lvl_b.slice(0x2000, 0x2400)
 	result["level_menu_nametable_b"] = nt_lvl_b
 
-	var ppu_lvl_a: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(HEIGHT_PATCH_ROM_OFFSET), ppu_lvl_b)
+	# Level Menu A: level menu stream + height patch + high scores table overlay
+	var ppu_lvl_a: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(LEVEL_MENU_NAMETABLE_ROM_OFFSET))
+	ppu_lvl_a = decode_ppu_nametable_stream(rom_bytes.slice(HEIGHT_PATCH_ROM_OFFSET), ppu_lvl_a)
+	ppu_lvl_a = decode_ppu_nametable_stream(rom_bytes.slice(HIGH_SCORE_NAMETABLE_ROM_OFFSET), ppu_lvl_a)
 	var nt_lvl_a: PackedByteArray = ppu_lvl_a.slice(0x2000, 0x2400)
 	result["level_menu_nametable_a"] = nt_lvl_a
 
-	var ppu_high: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(HIGH_SCORE_NAMETABLE_ROM_OFFSET))
-	var nt_high: PackedByteArray = ppu_high.slice(0x2000, 0x2400)
-	result["high_scores_nametable"] = nt_high
-
+	# High Scores Screen & Enter High Score Screen
 	var ppu_enter: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(ENTER_HIGH_SCORE_NAMETABLE_ROM_OFFSET))
+	ppu_enter = decode_ppu_nametable_stream(rom_bytes.slice(HIGH_SCORE_NAMETABLE_ROM_OFFSET), ppu_enter)
 	var nt_enter: PackedByteArray = ppu_enter.slice(0x2000, 0x2400)
 	result["enter_high_score_nametable"] = nt_enter
 
-	var ppu_ending: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TYPE_A_ENDING_NAMETABLE_ROM_OFFSET))
-	var nt_ending: PackedByteArray = ppu_ending.slice(0x2000, 0x2400)
-	result["type_a_ending_nametable"] = nt_ending
+	var ppu_high: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(ENTER_HIGH_SCORE_NAMETABLE_ROM_OFFSET))
+	ppu_high = decode_ppu_nametable_stream(rom_bytes.slice(HIGH_SCORE_NAMETABLE_ROM_OFFSET), ppu_high)
+	var nt_high: PackedByteArray = ppu_high.slice(0x2000, 0x2400)
+	result["high_scores_nametable"] = nt_high
 
-	# 10. Generate 256x240 Authentic Menu & Ending Textures
+	# In-game Background Nametables (HUD, Borders, Stats)
+	var ppu_game_a: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(GAME_NAMETABLE_ROM_OFFSET))
+	ppu_game_a[0x2083] = 0x0A # 'A' tile for A-TYPE
+	var nt_game_a: PackedByteArray = ppu_game_a.slice(0x2000, 0x2400)
+
+	var ppu_game_b: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(GAME_NAMETABLE_ROM_OFFSET))
+	ppu_game_b[0x2083] = 0x0B # 'B' tile for B-TYPE
+	var patch_b_data: PackedByteArray = rom_bytes.slice(GAME_TYPEB_PATCH_ROM_OFFSET, GAME_TYPEB_PATCH_ROM_OFFSET + 64)
+	apply_ppu_patch(ppu_game_b, patch_b_data)
+	var nt_game_b: PackedByteArray = ppu_game_b.slice(0x2000, 0x2400)
+
+	# Blank out baked-in 000000 placeholder tiles under TOP, SCORE, and Statistics so dynamic font glyphs don't double-draw
+	# TOP score: Row 5, Col 24..29
+	for c in range(24, 30):
+		nt_game_a[5 * 32 + c] = 0xFF
+		nt_game_b[5 * 32 + c] = 0xFF
+	# SCORE: Row 8, Col 24..29
+	for c in range(24, 30):
+		nt_game_a[8 * 32 + c] = 0xFF
+		nt_game_b[8 * 32 + c] = 0xFF
+	# Statistics counts: Rows 12, 14, 16, 18, 20, 22, 24, Col 6..8
+	for i in range(7):
+		var r: int = 12 + i * 2
+		for c in range(6, 9):
+			nt_game_a[r * 32 + c] = 0xFF
+			nt_game_b[r * 32 + c] = 0xFF
+
+	result["game_nametable_a"] = nt_game_a
+	result["game_nametable_b"] = nt_game_b
+
+	# Ending Nametables
+	var ppu_ending_a: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TYPE_A_ENDING_NAMETABLE_ROM_OFFSET))
+	var nt_ending_a: PackedByteArray = ppu_ending_a.slice(0x2000, 0x2400)
+	result["type_a_ending_nametable"] = nt_ending_a
+
+	var ppu_ending_120k: PackedByteArray = ppu_ending_a.duplicate()
+	var patch_120k_data: PackedByteArray = rom_bytes.slice(TYPE_A_120K_PATCH_ROM_OFFSET, TYPE_A_120K_PATCH_ROM_OFFSET + 96)
+	apply_ppu_patch(ppu_ending_120k, patch_120k_data)
+	var nt_ending_120k: PackedByteArray = ppu_ending_120k.slice(0x2000, 0x2400)
+	result["type_a_ending_120k_nametable"] = nt_ending_120k
+
+	var ppu_ending_b: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TYPE_B_ENDING_NAMETABLE_ROM_OFFSET))
+	var nt_ending_b: PackedByteArray = ppu_ending_b.slice(0x2000, 0x2400)
+	result["type_b_ending_nametable"] = nt_ending_b
+
+	var ppu_ending_b_lvl9: PackedByteArray = decode_ppu_nametable_stream(rom_bytes.slice(TYPE_B_LVL9_ENDING_NAMETABLE_ROM_OFFSET))
+	var nt_ending_b_lvl9: PackedByteArray = ppu_ending_b_lvl9.slice(0x2000, 0x2400)
+	result["type_b_lvl9_ending_nametable"] = nt_ending_b_lvl9
+
+	# 10. Generate 256x240 Authentic Menu, In-game HUD, and Ending Textures
 	var title_img: Image = render_nametable_image(nt_title, chr_bank_0, menu_palette)
 	var type_img: Image = render_nametable_image(nt_type, chr_bank_0, menu_palette)
 	var lvl_a_img: Image = render_nametable_image(nt_lvl_a, chr_bank_0, menu_palette)
 	var lvl_b_img: Image = render_nametable_image(nt_lvl_b, chr_bank_0, menu_palette)
 	var high_img: Image = render_nametable_image(nt_high, chr_bank_0, menu_palette)
 	var enter_img: Image = render_nametable_image(nt_enter, chr_bank_0, menu_palette)
-	var ending_img: Image = render_nametable_image(nt_ending, chr_bank_2, ending_palette)
+
+	var game_a_img: Image = render_nametable_image(nt_game_a, chr_bank_3, game_palette)
+	var game_b_img: Image = render_nametable_image(nt_game_b, chr_bank_3, game_palette)
+
+	var ending_a_img: Image = render_nametable_image(nt_ending_a, chr_bank_2, ending_palette)
+	var ending_120k_img: Image = render_nametable_image(nt_ending_120k, chr_bank_2, ending_palette)
+	var ending_b_img: Image = render_nametable_image(nt_ending_b, chr_bank_2, ending_palette)
+	var ending_b_lvl9_img: Image = render_nametable_image(nt_ending_b_lvl9, chr_bank_1, ending_palette)
 
 	result["title_screen_texture"] = ImageTexture.create_from_image(title_img)
 	result["game_type_menu_texture"] = ImageTexture.create_from_image(type_img)
@@ -461,7 +712,12 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	result["level_menu_b_texture"] = ImageTexture.create_from_image(lvl_b_img)
 	result["high_scores_texture"] = ImageTexture.create_from_image(high_img)
 	result["enter_high_score_texture"] = ImageTexture.create_from_image(enter_img)
-	result["type_a_ending_texture"] = ImageTexture.create_from_image(ending_img)
+	result["game_background_a_texture"] = ImageTexture.create_from_image(game_a_img)
+	result["game_background_b_texture"] = ImageTexture.create_from_image(game_b_img)
+	result["type_a_ending_texture"] = ImageTexture.create_from_image(ending_a_img)
+	result["type_a_ending_120k_texture"] = ImageTexture.create_from_image(ending_120k_img)
+	result["type_b_ending_texture"] = ImageTexture.create_from_image(ending_b_img)
+	result["type_b_lvl9_ending_texture"] = ImageTexture.create_from_image(ending_b_lvl9_img)
 
 	result["title_img"] = title_img
 	result["type_img"] = type_img
@@ -469,7 +725,141 @@ static func extract_all_from_rom_bytes(rom_bytes: PackedByteArray, enforce_check
 	result["lvl_b_img"] = lvl_b_img
 	result["high_img"] = high_img
 	result["enter_img"] = enter_img
-	result["ending_img"] = ending_img
+	result["game_a_img"] = game_a_img
+	result["game_b_img"] = game_b_img
+	result["ending_img"] = ending_a_img
+	result["ending_120k_img"] = ending_120k_img
+
+	# 10b. Extract Authentic Menu Cursor Sprites (CHR Bank 0 Tile 0x27 arrow, Tile 0xFC box)
+	var cursor_pal: Array[Color] = [
+		Color(0.0, 0.0, 0.0, 0.0),
+		Constants.NES_MASTER_PALETTE[menu_palette[1] if menu_palette.size() > 1 else 0x30],
+		Constants.NES_MASTER_PALETTE[menu_palette[2] if menu_palette.size() > 2 else 0x16],
+		Constants.NES_MASTER_PALETTE[menu_palette[3] if menu_palette.size() > 3 else 0x27],
+	]
+	var arrow_img: Image = extract_tile_image(chr_bank_0, 0x27, cursor_pal)
+	var arrow_flip_img: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	arrow_flip_img.copy_from(arrow_img)
+	arrow_flip_img.flip_x()
+	result["cursor_arrow_right_texture"] = ImageTexture.create_from_image(arrow_img)
+	result["cursor_arrow_left_texture"] = ImageTexture.create_from_image(arrow_flip_img)
+
+	var tile_fc_img: Image = extract_tile_image(chr_bank_0, 0xFC, cursor_pal)
+	result["cursor_tile_fc_texture"] = ImageTexture.create_from_image(tile_fc_img)
+
+	var box_16_img: Image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	box_16_img.fill(Color(0, 0, 0, 0))
+	box_16_img.blit_rect(tile_fc_img, Rect2i(0, 0, 8, 8), Vector2i(0, 0))
+	box_16_img.blit_rect(tile_fc_img, Rect2i(0, 0, 8, 8), Vector2i(8, 0))
+	box_16_img.blit_rect(tile_fc_img, Rect2i(0, 0, 8, 8), Vector2i(0, 8))
+	box_16_img.blit_rect(tile_fc_img, Rect2i(0, 0, 8, 8), Vector2i(8, 8))
+	result["cursor_box_texture"] = ImageTexture.create_from_image(box_16_img)
+
+	# 10d. Extract Authentic CHR Bank 3 Font Glyphs (0..9, A..Z, punctuation)
+	var font_pal: Array[Color] = [
+		Color(0.0, 0.0, 0.0, 0.0), # Background is transparent
+		Color(1.0, 1.0, 1.0, 1.0), # Foreground is white for modulate tinting
+		Color(1.0, 1.0, 1.0, 1.0),
+		Color(1.0, 1.0, 1.0, 1.0),
+	]
+	var font_glyphs: Dictionary = {}
+	# Digits 0..9 (Tiles 0x00..0x09)
+	for d in range(10):
+		var ch_str: String = str(d)
+		var img: Image = extract_tile_image(chr_bank_3, d, font_pal)
+		font_glyphs[ch_str] = ImageTexture.create_from_image(img)
+	# Letters A..Z (Tiles 0x0A..0x23)
+	var letters: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	for l_i in range(letters.length()):
+		var ch_str: String = letters[l_i]
+		var img: Image = extract_tile_image(chr_bank_3, 0x0A + l_i, font_pal)
+		font_glyphs[ch_str] = ImageTexture.create_from_image(img)
+	# Punctuation
+	var dash_img: Image = extract_tile_image(chr_bank_3, 0x24, font_pal)
+	font_glyphs["-"] = ImageTexture.create_from_image(dash_img)
+	var dot_img: Image = extract_tile_image(chr_bank_3, 0x25, font_pal)
+	font_glyphs["."] = ImageTexture.create_from_image(dot_img)
+	font_glyphs[","] = ImageTexture.create_from_image(dot_img)
+	var bang_img: Image = extract_tile_image(chr_bank_3, 0x28, font_pal)
+	font_glyphs["!"] = ImageTexture.create_from_image(bang_img)
+	var slash_img: Image = extract_tile_image(chr_bank_3, 0x2F, font_pal)
+	font_glyphs["/"] = ImageTexture.create_from_image(slash_img)
+	var space_img: Image = Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	space_img.fill(Color(0.0, 0.0, 0.0, 0.0))
+	font_glyphs[" "] = ImageTexture.create_from_image(space_img)
+	result["font_glyph_textures"] = font_glyphs
+
+	# 10e. Generate 128x128 Non-Mirrored Seamlessly Wrapping Puzzle Cluster Backgrounds
+	# Uses authentic interlocking NES Tetris border tiles from CHR Bank 3 (0x66-0x89)
+	# rendered in two exact color variants:
+	# - background_pattern_menu_texture: rendered with menu_palette Palette 2 (grey & white highlights)
+	# - background_pattern_game_texture: rendered with game_palette Palette 3 (grey & cyan/blue highlights)
+	var pattern_menu_img: Image = Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	var pattern_game_img: Image = Image.create(128, 128, false, Image.FORMAT_RGBA8)
+
+	var universal_bg_menu: Color = Constants.NES_MASTER_PALETTE[menu_palette[0] if menu_palette.size() > 0 else 0x16]
+	var universal_bg_game: Color = Constants.NES_MASTER_PALETTE[game_palette[0] if game_palette.size() > 0 else 0x3C]
+
+	var menu_pal_2: Array[Color] = [
+		universal_bg_menu,
+		Constants.NES_MASTER_PALETTE[menu_palette[9] if menu_palette.size() > 9 else 0x30],
+		Constants.NES_MASTER_PALETTE[menu_palette[11] if menu_palette.size() > 11 else 0x00],
+		Constants.NES_MASTER_PALETTE[menu_palette[9] if menu_palette.size() > 9 else 0x30],
+	]
+
+	var game_pal_3: Array[Color] = [
+		universal_bg_game,
+		Constants.NES_MASTER_PALETTE[game_palette[13] if game_palette.size() > 13 else 0x3C],
+		Constants.NES_MASTER_PALETTE[game_palette[14] if game_palette.size() > 14 else 0x00],
+		Constants.NES_MASTER_PALETTE[game_palette[15] if game_palette.size() > 15 else 0x30],
+	]
+
+	pattern_menu_img.fill(universal_bg_menu)
+	pattern_game_img.fill(universal_bg_game)
+
+	# Pre-decode all CHR Bank 3 tiles
+	var chr_b3_tiles: Array[PackedByteArray] = []
+	for t in range(256):
+		chr_b3_tiles.append(decode_tile_2bpp(chr_bank_3.slice(t * 16, (t + 1) * 16)))
+
+	for r in range(16):
+		for c in range(16):
+			var tile_id: int = WIDESCREEN_PUZZLE_CLUSTER_16X16[r][c]
+			var pixels: PackedByteArray = chr_b3_tiles[tile_id]
+			var origin_x: int = c * 8
+			var origin_y: int = r * 8
+
+			for py in range(8):
+				for px in range(8):
+					var col_val: int = pixels[py * 8 + px]
+					if col_val == 0:
+						pattern_menu_img.set_pixel(origin_x + px, origin_y + py, universal_bg_menu)
+						pattern_game_img.set_pixel(origin_x + px, origin_y + py, universal_bg_game)
+					else:
+						pattern_menu_img.set_pixel(origin_x + px, origin_y + py, menu_pal_2[col_val])
+						pattern_game_img.set_pixel(origin_x + px, origin_y + py, game_pal_3[col_val])
+
+	result["background_pattern_menu_texture"] = ImageTexture.create_from_image(pattern_menu_img)
+	result["background_pattern_game_texture"] = ImageTexture.create_from_image(pattern_game_img)
+	result["background_pattern_tile_texture"] = ImageTexture.create_from_image(pattern_game_img)
+
+	# 10c. Pre-render Authentic OAM Rocket Ending Sprites (CHR Bank 2 with ending_palette)
+	var ending_sprite_pal: PackedByteArray = ending_palette.slice(16, 32)
+	var rocket_sprites_data: Array[Dictionary] = []
+	for tier_idx in range(ROCKET_DEFINITIONS.size()):
+		var r_def: Dictionary = ROCKET_DEFINITIONS[tier_idx]
+		var body_data: Dictionary = render_sprite_group_image(chr_bank_2, r_def["body"], ending_sprite_pal)
+		var j1_data: Dictionary = render_sprite_group_image(chr_bank_2, r_def["jet_1"], ending_sprite_pal)
+		var j2_data: Dictionary = render_sprite_group_image(chr_bank_2, r_def["jet_2"], ending_sprite_pal)
+		rocket_sprites_data.append({
+			"body_tex": body_data["texture"],
+			"body_offset": body_data["offset"],
+			"jet_1_tex": j1_data["texture"],
+			"jet_1_offset": j1_data["offset"],
+			"jet_2_tex": j2_data["texture"],
+			"jet_2_offset": j2_data["offset"],
+		})
+	result["rocket_sprites_data"] = rocket_sprites_data
 
 	# 11. Extract Authentic Default High Score Table from PRG-ROM
 	var def_scores_a: Array[Dictionary] = []

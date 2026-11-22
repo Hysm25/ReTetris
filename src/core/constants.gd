@@ -9,6 +9,7 @@ const SCREEN_WIDTH: int = 256
 const SCREEN_HEIGHT: int = 240
 const WINDOW_SCALE: int = 3
 const TILE_SIZE: int = 8
+const NES_CPU_FREQ: float = 1789772.72727 # NTSC NES 2A03 CPU clock rate in Hz
 
 # --- Logical Playfield Dimensions ---
 const GRID_COLUMNS: int = 10
@@ -16,9 +17,9 @@ const GRID_ROWS: int = 22
 const VISIBLE_ROWS: int = 20
 const HIDDEN_ROWS: int = 2
 
-# Screen offsets for visible playfield (10x20 visible: 80x160 px, bounds: X: 96..175, Y: 40..199)
+# Screen offsets for visible playfield (10x20 visible: 80x160 px, bounds: X: 96..175, Y: 48..207)
 const PLAYFIELD_OFFSET_X: int = 96
-const PLAYFIELD_OFFSET_Y: int = 40
+const PLAYFIELD_OFFSET_Y: int = 48
 
 # Next-piece preview box screen offset
 const PREVIEW_OFFSET_X: int = 192
@@ -64,6 +65,7 @@ const ACTION_B: String = "tetris_b"
 const ACTION_START: String = "tetris_start"
 const ACTION_SELECT: String = "tetris_select"
 const ACTION_TOGGLE_CRT: String = "tetris_toggle_crt"
+const ACTION_TOGGLE_FULLSCREEN: String = "tetris_toggle_fullscreen"
 const ACTION_RESET: String = "tetris_reset"
 
 # --- Game Modes & Menu Navigation ---

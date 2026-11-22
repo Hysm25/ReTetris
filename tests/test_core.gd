@@ -156,6 +156,7 @@ static func test_event_bus_signals() -> void:
 	var signal_received: Dictionary = {
 		"spawned": false,
 		"moved": false,
+		"shifted": false,
 		"rotated": false,
 		"locked": false,
 		"clearing": false,
@@ -169,6 +170,7 @@ static func test_event_bus_signals() -> void:
 
 	bus.piece_spawned.connect(func(_p: int, _pos: Vector2i, _o: int) -> void: signal_received["spawned"] = true)
 	bus.piece_moved.connect(func(_p: int, _pos: Vector2i, _o: int) -> void: signal_received["moved"] = true)
+	bus.piece_shifted.connect(func(_p: int, _pos: Vector2i, _o: int) -> void: signal_received["shifted"] = true)
 	bus.piece_rotated.connect(func(_p: int, _pos: Vector2i, _o: int) -> void: signal_received["rotated"] = true)
 	bus.piece_locked.connect(func(_p: int, _pos: Vector2i, _o: int) -> void: signal_received["locked"] = true)
 	bus.lines_clearing.connect(func(_r: Array[int], _s: int) -> void: signal_received["clearing"] = true)
@@ -181,6 +183,7 @@ static func test_event_bus_signals() -> void:
 
 	bus.emit_piece_spawned(0, Vector2i(5, 0), 2)
 	bus.emit_piece_moved(0, Vector2i(6, 0), 2)
+	bus.emit_piece_shifted(0, Vector2i(6, 0), 2)
 	bus.emit_piece_rotated(0, Vector2i(6, 0), 1)
 	bus.emit_piece_locked(0, Vector2i(6, 20), 1)
 	bus.emit_lines_clearing([20], 0)

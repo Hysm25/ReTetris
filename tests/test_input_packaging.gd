@@ -368,6 +368,66 @@ static func test_virtual_gamepad_simulation() -> bool:
 		mgr.free()
 		return false
 
+	# 5. Dynamic Layout Anchoring (Widescreen 426x240)
+	pad.set_active(true)
+	pad.update_layout(Vector2(426.0, 240.0))
+	if absf(pad.rect_btn_b.position.x - (426.0 - 70.0)) > 0.01:
+		push_error("VirtualGamepad widescreen Button B anchoring failed: %v" % pad.rect_btn_b.position)
+		pad.free()
+		mgr.free()
+		return false
+	if absf(pad.rect_btn_a.position.x - (426.0 - 36.0)) > 0.01:
+		push_error("VirtualGamepad widescreen Button A anchoring failed: %v" % pad.rect_btn_a.position)
+		pad.free()
+		mgr.free()
+		return false
+	if absf(pad.rect_select.position.x - (213.0 - 32.0)) > 0.01:
+		push_error("VirtualGamepad widescreen Select anchoring failed: %v" % pad.rect_select.position)
+		pad.free()
+		mgr.free()
+		return false
+
+	# 6. Direct Hit-testing in widescreen space
+	var wide_a_pt: Vector2 = pad.rect_btn_a.position + pad.rect_btn_a.size * 0.5
+	if pad._hit_test(wide_a_pt) != Constants.BUTTON_A:
+		push_error("VirtualGamepad widescreen hit-test failed for Button A")
+		pad.free()
+		mgr.free()
+		return false
+
+	# 7. Auto-hide on physical keyboard event
+	var ev_key: InputEventKey = InputEventKey.new()
+	ev_key.pressed = true
+	ev_key.keycode = KEY_SPACE
+	pad._input(ev_key)
+	if pad.is_active:
+		push_error("VirtualGamepad did not auto-hide on keyboard event")
+		pad.free()
+		mgr.free()
+		return false
+
+	# 8. Auto-show on touch event
+	var ev_touch: InputEventScreenTouch = InputEventScreenTouch.new()
+	ev_touch.pressed = true
+	ev_touch.position = wide_a_pt
+	pad._input(ev_touch)
+	if not pad.is_active:
+		push_error("VirtualGamepad did not auto-show on touch event")
+		pad.free()
+		mgr.free()
+		return false
+
+	# 9. Auto-hide on joypad button event
+	var ev_joy: InputEventJoypadButton = InputEventJoypadButton.new()
+	ev_joy.pressed = true
+	ev_joy.button_index = JOY_BUTTON_A
+	pad._input(ev_joy)
+	if pad.is_active:
+		push_error("VirtualGamepad did not auto-hide on joypad button event")
+		pad.free()
+		mgr.free()
+		return false
+
 	pad.free()
 	mgr.free()
 	print("    -> VirtualGamepad simulation verified successfully")

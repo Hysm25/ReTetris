@@ -74,6 +74,7 @@ class NoiseChannel:
 	var shift_reg: int = 1 # 15-bit LFSR
 	var timer: float = 0.0
 	var period: float = 0.001
+	var is_periodic: bool = false
 	var current_output: float = 0.0
 
 	func sample(dt: float) -> float:
@@ -82,7 +83,7 @@ class NoiseChannel:
 		timer += dt
 		if timer >= period:
 			timer -= period
-			var feedback: int = (shift_reg ^ (shift_reg >> 1)) & 1
+			var feedback: int = (shift_reg ^ (shift_reg >> (6 if is_periodic else 1))) & 1
 			shift_reg = ((shift_reg >> 1) | (feedback << 14)) & 0x7FFF
 			current_output = 1.0 if (shift_reg & 1) == 0 else -1.0
 		return current_output * volume
@@ -140,7 +141,7 @@ func _init_audio_stream() -> void:
 	stream_player = AudioStreamPlayer.new()
 	var generator: AudioStreamGenerator = AudioStreamGenerator.new()
 	generator.mix_rate = float(SAMPLE_RATE)
-	generator.buffer_length = 0.1 # 100ms buffer latency
+	generator.buffer_length = 0.15 # 150ms buffer latency to prevent underruns
 	stream_player.stream = generator
 	add_child(stream_player)
 	stream_player.play()
@@ -153,8 +154,8 @@ func _connect_event_bus() -> void:
 	if bus == null:
 		return
 
-	if not bus.is_connected("piece_moved", _on_piece_moved):
-		bus.connect("piece_moved", _on_piece_moved)
+	if not bus.is_connected("piece_shifted", _on_piece_shifted):
+		bus.connect("piece_shifted", _on_piece_shifted)
 	if not bus.is_connected("piece_rotated", _on_piece_rotated):
 		bus.connect("piece_rotated", _on_piece_rotated)
 	if not bus.is_connected("piece_locked", _on_piece_locked):
@@ -184,11 +185,12 @@ func ingest_rom_audio_data(data: Dictionary) -> void:
 	is_initialized = true
 
 ## Returns the 16-bit timer period for a given note index from the extracted table.
+## noteToWaveTable is stored in big-endian .dbyt format: [hi, lo].
 func get_timer_period_for_note(note_idx: int) -> int:
 	if note_to_wave_table.size() >= (note_idx * 2 + 2):
-		var lo: int = note_to_wave_table[note_idx * 2]
-		var hi: int = note_to_wave_table[note_idx * 2 + 1]
-		return lo | (hi << 8)
+		var hi: int = note_to_wave_table[note_idx * 2]
+		var lo: int = note_to_wave_table[note_idx * 2 + 1]
+		return lo | ((hi & 0x07) << 8)
 	return 0x152 # Fallback to E4 if out of range
 
 ## Plays an authentic procedural SFX.
@@ -251,20 +253,26 @@ func _process(_delta: float) -> void:
 	if playback == null:
 		return
 
-	# Fill available audio buffer frames
+	# Fill available audio buffer frames in batches to prevent underruns
 	var frames_to_fill: int = playback.get_frames_available()
+	if frames_to_fill <= 0:
+		return
+
+	var buffer: PackedVector2Array = PackedVector2Array()
+	buffer.resize(frames_to_fill)
 	var dt: float = 1.0 / float(SAMPLE_RATE)
 
-	while frames_to_fill > 0:
+	for i in range(frames_to_fill):
 		var s_sq1: float = sq1.sample(dt)
 		var s_sq2: float = sq2.sample(dt)
 		var s_tri: float = tri.sample(dt)
 		var s_noise: float = noise.sample(dt)
 
-		var mix: float = (s_sq1 * 0.3 + s_sq2 * 0.3 + s_tri * 0.3 + s_noise * 0.15)
-		mix = clampf(mix, -1.0, 1.0)
-		playback.push_frame(Vector2(mix, mix))
-		frames_to_fill -= 1
+		# Gain staging: 0.25 + 0.25 + 0.28 + 0.08 = 0.86 <= 1.0 (prevents digital clipping, balanced noise percussion)
+		var mix: float = clampf(s_sq1 * 0.25 + s_sq2 * 0.25 + s_tri * 0.28 + s_noise * 0.08, -1.0, 1.0)
+		buffer[i] = Vector2(mix, mix)
+
+	playback.push_buffer(buffer)
 
 func _apply_channel_states() -> void:
 	var sfx_on_sq1: bool = false
@@ -281,12 +289,18 @@ func _apply_channel_states() -> void:
 		sq1.timer_period = ch0.timer_period
 		sq1.volume = ch0.volume
 		sq1.duty = ch0.duty
+		if ch0.reset_phase:
+			sq1.phase = 0.0
+			ch0.reset_phase = false
 
 	var ch1 = music_player.channels[1]
 	sq2.enabled = ch1.enabled and ch1.volume > 0.0
 	sq2.timer_period = ch1.timer_period
 	sq2.volume = ch1.volume
 	sq2.duty = ch1.duty
+	if ch1.reset_phase:
+		sq2.phase = 0.0
+		ch1.reset_phase = false
 
 	var ch2 = music_player.channels[2]
 	tri.enabled = ch2.enabled and ch2.volume > 0.0
@@ -298,6 +312,7 @@ func _apply_channel_states() -> void:
 		noise.enabled = ch3.enabled and ch3.volume > 0.0
 		noise.volume = ch3.volume
 		noise.period = ch3.noise_period
+		noise.is_periodic = ch3.is_periodic_noise
 
 ## Advances active SFX animation at 60 Hz simulation tick.
 func _update_sfx() -> void:
@@ -355,10 +370,18 @@ func _update_sfx() -> void:
 					noise.volume = 0.5 * (1.0 - progress)
 
 		if sfx.frame >= sfx.max_frames:
-			if sfx.channel == "sq1":
-				sq1.enabled = false
-			noise.enabled = false
 			active_sfx_list.remove_at(idx)
+			var has_other_sq1: bool = false
+			var has_other_noise: bool = false
+			for other in active_sfx_list:
+				if other.channel == "sq1":
+					has_other_sq1 = true
+				elif other.channel == "noise":
+					has_other_noise = true
+			if not has_other_sq1:
+				sq1.enabled = false
+			if not has_other_noise:
+				noise.enabled = false
 		idx -= 1
 
 ## Synthesizes a chunk of samples directly into a float array (for headless verification tests).
@@ -373,7 +396,7 @@ func synthesize_chunk(num_samples: int) -> PackedFloat32Array:
 		var s_sq2: float = sq2.sample(dt)
 		var s_tri: float = tri.sample(dt)
 		var s_noise: float = noise.sample(dt)
-		var mix: float = clampf(s_sq1 * 0.3 + s_sq2 * 0.3 + s_tri * 0.3 + s_noise * 0.15, -1.0, 1.0)
+		var mix: float = clampf(s_sq1 * 0.25 + s_sq2 * 0.25 + s_tri * 0.28 + s_noise * 0.08, -1.0, 1.0)
 		result[i] = mix
 
 	return result
@@ -421,8 +444,12 @@ func play_raw_track(track_id: int) -> void:
 
 # --- EventBus Handlers ---
 
-func _on_piece_moved(_piece_type: int, _pos: Vector2i, _ori: int) -> void:
+func _on_piece_shifted(_piece_type: int, _pos: Vector2i, _ori: int) -> void:
 	play_sfx(SFX.SHIFT)
+
+func _on_piece_moved(_piece_type: int, _pos: Vector2i, _ori: int) -> void:
+	# Neither gravity falling nor soft-dropping plays any sound effect in authentic 1989 NES Tetris
+	pass
 
 func _on_piece_rotated(_piece_type: int, _pos: Vector2i, _ori: int) -> void:
 	play_sfx(SFX.ROTATE)

@@ -5,6 +5,7 @@ extends Node
 
 signal piece_spawned(piece_type: int, position: Vector2i, orientation: int)
 signal piece_moved(piece_type: int, position: Vector2i, orientation: int)
+signal piece_shifted(piece_type: int, position: Vector2i, orientation: int)
 signal piece_rotated(piece_type: int, position: Vector2i, orientation: int)
 signal piece_locked(piece_type: int, position: Vector2i, orientation: int)
 signal lines_clearing(rows: Array[int], frame_step: int)
@@ -23,6 +24,9 @@ func emit_piece_spawned(piece_type: int, position: Vector2i, orientation: int) -
 
 func emit_piece_moved(piece_type: int, position: Vector2i, orientation: int) -> void:
 	piece_moved.emit(piece_type, position, orientation)
+
+func emit_piece_shifted(piece_type: int, position: Vector2i, orientation: int) -> void:
+	piece_shifted.emit(piece_type, position, orientation)
 
 func emit_piece_rotated(piece_type: int, position: Vector2i, orientation: int) -> void:
 	piece_rotated.emit(piece_type, position, orientation)

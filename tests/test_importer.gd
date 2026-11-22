@@ -186,6 +186,19 @@ static func test_100_percent_data_extraction() -> void:
 	assert(level_textures[0].tile_2 is ImageTexture, "Tile 2 must be ImageTexture")
 	assert(level_textures[0].tile_3 is ImageTexture, "Tile 3 must be ImageTexture")
 
+	# 8. Authentic Visual In-Game HUD & Background Textures
+	assert(res.game_background_a_texture is ImageTexture, "game_background_a_texture must be ImageTexture")
+	assert(res.game_background_a_texture.get_size() == Vector2(256, 240), "game_background_a_texture must be 256x240")
+	assert(res.game_background_b_texture is ImageTexture, "game_background_b_texture must be ImageTexture")
+	assert(res.game_background_b_texture.get_size() == Vector2(256, 240), "game_background_b_texture must be 256x240")
+
+	# 9. Authentic Cursors & Ending Rockets
+	assert(res.cursor_arrow_right_texture is ImageTexture, "cursor_arrow_right_texture must be ImageTexture")
+	assert(res.cursor_arrow_left_texture is ImageTexture, "cursor_arrow_left_texture must be ImageTexture")
+	assert(res.cursor_box_texture is ImageTexture, "cursor_box_texture must be ImageTexture")
+	assert(res.type_a_ending_120k_texture is ImageTexture, "type_a_ending_120k_texture must be ImageTexture")
+	assert(res.rocket_sprites_data is Array and res.rocket_sprites_data.size() == 5, "rocket_sprites_data must contain 5 tiers")
+
 static func test_content_registry_and_audio_injection() -> void:
 	var rom_path: String = "Tetris (USA).nes"
 	if not FileAccess.file_exists(rom_path):
@@ -206,6 +219,11 @@ static func test_content_registry_and_audio_injection() -> void:
 	assert(reg.get_gravity_frames(0) == 48, "Registry gravity level 0 must be 48")
 	assert(reg.get_score_points(4) == 1200, "Registry score for 4 lines must be 1200")
 	assert(reg.get_tile_texture(Constants.TileType.PRIMARY, 0) != null, "Primary tile texture must not be null")
+	assert(reg.get_font_glyph("0") != null, "Digit 0 glyph texture must not be null")
+	assert(reg.get_font_glyph("A") != null, "Letter A glyph texture must not be null")
+	assert(reg.get_background_pattern_tile_texture() != null, "Background pattern tile texture must not be null")
+	assert(reg.get_background_pattern_tile_texture(true).get_size() == Vector2(128, 128), "Menu background pattern must be 128x128")
+	assert(reg.get_background_pattern_tile_texture(false).get_size() == Vector2(128, 128), "Game background pattern must be 128x128")
 
 	reg.reset_custom_textures()
 	reg.free()

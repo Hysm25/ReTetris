@@ -14,6 +14,8 @@ static func run_tests() -> bool:
 	test_sfx_lifecycle_and_queuing()
 	test_audio_sample_synthesis()
 	test_event_bus_handlers()
+	test_big_endian_timer_period_lookup()
+	test_non_clipping_gain_staging()
 	print("  -> TestAudio: PASSED")
 	return true
 
@@ -72,6 +74,13 @@ static func test_noise_channel() -> void:
 
 	# Noise should produce non-zero outputs
 	assert(distinct_samples.size() > 0, "Noise must produce outputs")
+	# Output should be zero-centered AC (-0.5 or +0.5)
+	assert(distinct_samples.has(0.5) or distinct_samples.has(-0.5), "Noise output must be zero-centered AC")
+
+	# Test periodic mode
+	noise.is_periodic = true
+	var s_periodic: float = noise.sample(dt)
+	assert(absf(s_periodic) == 0.5, "Periodic noise output must be bounded to volume")
 
 static func test_sfx_lifecycle_and_queuing() -> void:
 	var audio = AudioManager.new()
@@ -122,8 +131,13 @@ static func test_event_bus_handlers() -> void:
 	var audio = AudioManager.new()
 	audio.audio_enabled = true
 
+	# Horizontal shift triggers SHIFT SFX
+	audio._on_piece_shifted(0, Vector2i.ZERO, 0)
+	assert(audio.get_active_sfx_count() == 1, "piece_shifted should trigger 1 SFX (SHIFT)")
+
+	# Vertical descent (gravity/soft-drop) triggers NO SFX in authentic 1989 NES Tetris
 	audio._on_piece_moved(0, Vector2i.ZERO, 0)
-	assert(audio.get_active_sfx_count() == 1, "piece_moved should trigger 1 SFX (SHIFT)")
+	assert(audio.get_active_sfx_count() == 1, "piece_moved (falling) must not trigger any SFX")
 
 	audio._on_piece_rotated(0, Vector2i.ZERO, 0)
 	assert(audio.get_active_sfx_count() == 2, "piece_rotated should trigger 1 SFX (ROTATE)")
@@ -146,3 +160,36 @@ static func test_event_bus_handlers() -> void:
 	audio.clear_sfx()
 	assert(audio.get_active_sfx_count() == 0, "clear_sfx must empty queue")
 	audio.free()
+
+static func test_big_endian_timer_period_lookup() -> void:
+	var audio = AudioManager.new()
+	# Simulate note_to_wave_table with E4 (0x0152): Big-endian .dbyt byte 0 = 0x01 (hi), byte 1 = 0x52 (lo)
+	audio.note_to_wave_table = PackedByteArray([0x01, 0x52, 0x00, 0xBD])
+	var period_e4: int = audio.get_timer_period_for_note(0)
+	assert(period_e4 == 0x0152, "Note 0 period must be 0x0152 (338), got 0x%X" % period_e4)
+	var period_d5: int = audio.get_timer_period_for_note(1)
+	assert(period_d5 == 0x00BD, "Note 1 period must be 0x00BD (189), got 0x%X" % period_d5)
+	audio.free()
+
+static func test_non_clipping_gain_staging() -> void:
+	var audio = AudioManager.new()
+	audio.audio_enabled = true
+	# Set all 4 channels to maximum volume (1.0)
+	audio.sq1.enabled = true
+	audio.sq1.volume = 1.0
+	audio.sq1.timer_period = 200
+	audio.sq2.enabled = true
+	audio.sq2.volume = 1.0
+	audio.sq2.timer_period = 300
+	audio.tri.enabled = true
+	audio.tri.volume = 1.0
+	audio.tri.timer_period = 400
+	audio.noise.enabled = true
+	audio.noise.volume = 1.0
+
+	var buffer: PackedFloat32Array = audio.synthesize_chunk(500)
+	for s in buffer:
+		# With weights 0.25 + 0.25 + 0.28 + 0.08 = 0.86, peak sample should never exceed 0.86
+		assert(absf(s) <= 0.87, "Audio gain staging must prevent digital clipping (<= 0.87), got %f" % absf(s))
+	audio.free()
+

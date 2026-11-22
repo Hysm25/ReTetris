@@ -84,14 +84,28 @@ var music_data_table: PackedByteArray = PackedByteArray()
 var music_vol_table: PackedByteArray = PackedByteArray()
 var noises_table: PackedByteArray = PackedByteArray()
 
-# Extracted Authentic Menu Textures (256x240)
+# Extracted Authentic Menu & In-Game Textures (256x240)
 var title_screen_texture: ImageTexture = null
 var game_type_menu_texture: ImageTexture = null
 var level_menu_a_texture: ImageTexture = null
 var level_menu_b_texture: ImageTexture = null
 var high_scores_texture: ImageTexture = null
 var enter_high_score_texture: ImageTexture = null
+var game_background_a_texture: ImageTexture = null
+var game_background_b_texture: ImageTexture = null
 var type_a_ending_texture: ImageTexture = null
+var type_a_ending_120k_texture: ImageTexture = null
+var type_b_ending_texture: ImageTexture = null
+var type_b_lvl9_ending_texture: ImageTexture = null
+var cursor_arrow_right_texture: ImageTexture = null
+var cursor_arrow_left_texture: ImageTexture = null
+var cursor_tile_fc_texture: ImageTexture = null
+var cursor_box_texture: ImageTexture = null
+var font_glyph_textures: Dictionary = {}
+var background_pattern_tile_texture: ImageTexture = null
+var background_pattern_menu_texture: ImageTexture = null
+var background_pattern_game_texture: ImageTexture = null
+var rocket_sprites_data: Array[Dictionary] = []
 var menu_palette_colors: Array[Color] = []
 var ending_palette_colors: Array[Color] = []
 var default_high_scores: Dictionary = {}
@@ -246,6 +260,34 @@ func ingest_rom_data(extracted_data: Dictionary) -> bool:
 		enter_high_score_texture = extracted_data["enter_high_score_texture"] as ImageTexture
 	if extracted_data.has("type_a_ending_texture"):
 		type_a_ending_texture = extracted_data["type_a_ending_texture"] as ImageTexture
+	if extracted_data.has("type_a_ending_120k_texture"):
+		type_a_ending_120k_texture = extracted_data["type_a_ending_120k_texture"] as ImageTexture
+	if extracted_data.has("type_b_ending_texture"):
+		type_b_ending_texture = extracted_data["type_b_ending_texture"] as ImageTexture
+	if extracted_data.has("type_b_lvl9_ending_texture"):
+		type_b_lvl9_ending_texture = extracted_data["type_b_lvl9_ending_texture"] as ImageTexture
+	if extracted_data.has("game_background_a_texture"):
+		game_background_a_texture = extracted_data["game_background_a_texture"] as ImageTexture
+	if extracted_data.has("game_background_b_texture"):
+		game_background_b_texture = extracted_data["game_background_b_texture"] as ImageTexture
+	if extracted_data.has("cursor_arrow_right_texture"):
+		cursor_arrow_right_texture = extracted_data["cursor_arrow_right_texture"] as ImageTexture
+	if extracted_data.has("cursor_arrow_left_texture"):
+		cursor_arrow_left_texture = extracted_data["cursor_arrow_left_texture"] as ImageTexture
+	if extracted_data.has("cursor_tile_fc_texture"):
+		cursor_tile_fc_texture = extracted_data["cursor_tile_fc_texture"] as ImageTexture
+	if extracted_data.has("cursor_box_texture"):
+		cursor_box_texture = extracted_data["cursor_box_texture"] as ImageTexture
+	if extracted_data.has("font_glyph_textures"):
+		font_glyph_textures = extracted_data["font_glyph_textures"] as Dictionary
+	if extracted_data.has("background_pattern_tile_texture"):
+		background_pattern_tile_texture = extracted_data["background_pattern_tile_texture"] as ImageTexture
+	if extracted_data.has("background_pattern_menu_texture"):
+		background_pattern_menu_texture = extracted_data["background_pattern_menu_texture"] as ImageTexture
+	if extracted_data.has("background_pattern_game_texture"):
+		background_pattern_game_texture = extracted_data["background_pattern_game_texture"] as ImageTexture
+	if extracted_data.has("rocket_sprites_data"):
+		rocket_sprites_data = extracted_data["rocket_sprites_data"]
 	if extracted_data.has("menu_palette"):
 		var raw_pal: PackedByteArray = extracted_data["menu_palette"]
 		menu_palette_colors.clear()
@@ -349,6 +391,62 @@ func get_enter_high_score_texture() -> ImageTexture:
 func get_type_a_ending_texture() -> ImageTexture:
 	return type_a_ending_texture if is_initialized else _empty_tile_texture
 
+func get_game_background_texture(game_type: int = 0) -> ImageTexture:
+	if not is_initialized:
+		return _empty_tile_texture
+	if game_type == Constants.GameType.TYPE_B and game_background_b_texture != null:
+		return game_background_b_texture
+	return game_background_a_texture if game_background_a_texture != null else _empty_tile_texture
+
+func get_cursor_arrow_texture(flip_left: bool = false) -> ImageTexture:
+	if not is_initialized:
+		return _empty_tile_texture
+	return cursor_arrow_left_texture if flip_left else cursor_arrow_right_texture
+
+func get_cursor_box_texture() -> ImageTexture:
+	return cursor_box_texture if is_initialized else _empty_tile_texture
+
+func get_cursor_tile_fc_texture() -> ImageTexture:
+	return cursor_tile_fc_texture if is_initialized else _empty_tile_texture
+
+func get_font_glyph(char_key: String) -> ImageTexture:
+	if font_glyph_textures.has(char_key):
+		return font_glyph_textures[char_key] as ImageTexture
+	return null
+
+func get_background_pattern_tile_texture(is_menu: bool = false) -> ImageTexture:
+	if not is_initialized:
+		return null
+	if is_menu and background_pattern_menu_texture != null:
+		return background_pattern_menu_texture
+	if not is_menu and background_pattern_game_texture != null:
+		return background_pattern_game_texture
+	return background_pattern_tile_texture
+
+func get_ending_texture(tier: int = 0) -> ImageTexture:
+	if not is_initialized:
+		return _empty_tile_texture
+	if tier == Constants.RocketTier.TIER_4_CATHEDRAL and type_a_ending_120k_texture != null:
+		return type_a_ending_120k_texture
+	return type_a_ending_texture if type_a_ending_texture != null else _empty_tile_texture
+
+func draw_ending_rocket(canvas: CanvasItem, tier: int, rocket_pos: Vector2, frame_counter: int) -> void:
+	if not is_initialized or tier < 0 or tier >= rocket_sprites_data.size():
+		return
+	var r_data: Dictionary = rocket_sprites_data[tier]
+	var body_tex: Texture2D = r_data.get("body_tex") as Texture2D
+	var body_offset: Vector2 = r_data.get("body_offset", Vector2.ZERO) as Vector2
+	if body_tex != null:
+		canvas.draw_texture(body_tex, rocket_pos + body_offset)
+
+	# Draw animated thrusters during climb
+	if frame_counter >= Constants.ROCKET_LAUNCH_DELAY_FRAMES and rocket_pos.y > -50.0:
+		var flame_toggle: bool = (frame_counter & 0x02) != 0
+		var jet_tex: Texture2D = (r_data.get("jet_2_tex") if flame_toggle else r_data.get("jet_1_tex")) as Texture2D
+		var jet_offset: Vector2 = (r_data.get("jet_2_offset") if flame_toggle else r_data.get("jet_1_offset")) as Vector2
+		if jet_tex != null:
+			canvas.draw_texture(jet_tex, rocket_pos + jet_offset)
+
 func get_default_high_scores() -> Dictionary:
 	return default_high_scores
 
@@ -387,6 +485,16 @@ func reset_custom_textures() -> void:
 	high_scores_texture = null
 	enter_high_score_texture = null
 	type_a_ending_texture = null
+	type_a_ending_120k_texture = null
+	type_b_ending_texture = null
+	type_b_lvl9_ending_texture = null
+	game_background_a_texture = null
+	game_background_b_texture = null
+	cursor_arrow_right_texture = null
+	cursor_arrow_left_texture = null
+	cursor_tile_fc_texture = null
+	cursor_box_texture = null
+	rocket_sprites_data.clear()
 	menu_palette_colors.clear()
 	ending_palette_colors.clear()
 	default_high_scores.clear()

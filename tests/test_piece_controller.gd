@@ -14,6 +14,7 @@ static func run_tests() -> bool:
 	test_nrs_rotation_zero_kicks()
 	test_gravity_and_soft_drop()
 	test_instant_lock()
+	test_soft_drop_points_routine()
 	print("  -> TestPieceController: PASSED")
 	return true
 
@@ -110,3 +111,65 @@ static func test_instant_lock() -> void:
 	# When contacting floor: instant lock! Zero grace period.
 	assert(lock_res["locked"], "Piece must lock instantly upon contacting floor")
 	assert(not pc.is_active, "Piece should no longer be active after locking")
+
+static func test_soft_drop_points_routine() -> void:
+	var grid = BoardGrid.new()
+	var pc = PieceController.new()
+
+	# Scenario 1: Soft-drop 3 rows and lock into floor
+	# O piece at y=18. Rows occupied: 18, 19. Floor is row 22.
+	# Dropping from y=18 -> 19 (drop 1), 19 -> 20 (drop 2), attempt 20 -> 21 (hit floor, lock!)
+	pc.spawn(Constants.PieceType.O, grid, Vector2i(5, 18))
+	# Tick 1: soft drop frame 1 (no move)
+	var r1 = pc.tick_gravity(0, true, grid)
+	assert(not r1["moved_down"] and not r1["locked"])
+	# Tick 2: soft drop frame 2 (drops to y=19)
+	var r2 = pc.tick_gravity(0, true, grid)
+	assert(r2["moved_down"] and pc.position.y == 19)
+	# Tick 3: soft drop frame 1
+	var r3 = pc.tick_gravity(0, true, grid)
+	assert(not r3["moved_down"] and not r3["locked"])
+	# Tick 4: soft drop frame 2 (drops to y=20)
+	var r4 = pc.tick_gravity(0, true, grid)
+	assert(r4["moved_down"] and pc.position.y == 20)
+	# Tick 5: soft drop frame 1
+	var r5 = pc.tick_gravity(0, true, grid)
+	assert(not r5["moved_down"] and not r5["locked"])
+	# Tick 6: soft drop frame 2 (attempts y=21 -> contacts floor -> lock!)
+	var r6 = pc.tick_gravity(0, true, grid)
+	assert(r6["locked"], "Must lock upon floor contact")
+	assert(r6["drop_points_awarded"] == 2, "Must award 2 drop points for 2 soft-dropped rows")
+	var awarded_pts: int = pc.get_and_clear_drop_points()
+	# Because r6 already calculated drop_points - 1, and get_and_clear_drop_points clears it:
+	# Note that get_and_clear_drop_points() also returns 2 if called right after lock:
+	# Let us verify a fresh spawn
+	pc.spawn(Constants.PieceType.O, grid, Vector2i(5, 18))
+	for _i in range(6):
+		pc.tick_gravity(0, true, grid)
+	assert(pc.get_and_clear_drop_points() == 2, "get_and_clear_drop_points must return 2")
+	assert(pc.get_and_clear_drop_points() == 0, "Subsequent call must return 0")
+
+	# Scenario 2: Down released before locking resets drop points to 0 (main.asm:1559)
+	pc.spawn(Constants.PieceType.O, grid, Vector2i(5, 18))
+	# Soft-drop 1 row
+	pc.tick_gravity(0, true, grid)
+	pc.tick_gravity(0, true, grid)
+	assert(pc.position.y == 19)
+	# Release down
+	pc.tick_gravity(0, false, grid)
+	assert(pc.drop_points == 0, "Releasing Down must reset drop_points to 0")
+	# Force normal gravity drop until lock
+	pc.gravity_timer = 47
+	pc.tick_gravity(0, false, grid) # drops to y=20
+	pc.gravity_timer = 47
+	var g_lock = pc.tick_gravity(0, false, grid) # locks
+	assert(g_lock["locked"])
+	assert(pc.get_and_clear_drop_points() == 0, "Zero points awarded if Down released before lock")
+
+	# Scenario 3: Soft-drop with 0 dropped rows (already resting on floor)
+	pc.spawn(Constants.PieceType.O, grid, Vector2i(5, 20))
+	pc.tick_gravity(0, true, grid)
+	var imm_lock = pc.tick_gravity(0, true, grid)
+	assert(imm_lock["locked"])
+	assert(imm_lock["drop_points_awarded"] == 0, "Zero points awarded if piece locked without dropping any rows")
+	assert(pc.get_and_clear_drop_points() == 0)

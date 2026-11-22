@@ -138,4 +138,77 @@ updated: 2026-11-20
   - **Mobile Virtual Gamepad**: Implemented `src/game/virtual_gamepad.gd` multi-touch CanvasLayer emulating authentic NES D-Pad, B/A action buttons, and Start/Select buttons with coordinate translation and mobile auto-activation.
   - **Export Presets & Standalone Packaging**: Added `export_presets.cfg` covering Linux/X11, Windows, Android, and Web platforms with strict clean-room exclude filters (`TetrisNESDisasm/*`, `*.nes`, etc.), plus FreeDesktop launcher `packaging/retetris.desktop` and packaging runner `scripts/build_package.sh`.
   - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **14/14 test suites passing cleanly** (including `tests/test_input_packaging.gd`).
-  - **Next Target Milestone**: Extended features and modding architecture (custom palettes, skins, dual-board netplay).
+- **Phase 6 Completion (Custom Skin & Palette Modding Loader)**:
+  - **ModLoader Autoload**: Implemented `src/core/mod_loader.gd` integrating with `ContentRegistry` and `EventBus` without mutating authentic ROM caches. Preserves immutable ROM backups (`_rom_color_table`, `_rom_level_textures`).
+  - **Built-in Presets**: 6 palette presets (`authentic`, `gameboy_dmg`, `vaporwave`, `cyberpunk`, `monochrome`, `tgm_arcade`) and 4 skin presets (`authentic`, `gameboy`, `minimalist`, `neon_frame`).
+  - **Dynamic 8x8 Tile Colorization**: Maps monochrome/grayscale mino textures to 4-color level palettes at runtime.
+  - **Disk Mod Discovery & Ingestion**: Scans `user://mods/palettes/`, `user://mods/skins/`, `res://mods/palettes/`, and `res://mods/skins/`. Parses HEX/NES index palettes and 24x8/32x8 skin sheets.
+  - **Persistence & Failsafe**: Configuration persistence (`user://mod_config.json`), sample mod generator (`create_sample_mods`), and failsafe `reset_to_authentic()` restoration.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **15/15 test suites passing cleanly** (including `tests/test_mod_loader.gd`).
+- **Visual Accuracy & Nametable/Cursor Refactor**:
+  - **100% Authentic Nametables & Background Extraction**: Extracted and verified authentic PPU nametable streams for Title Screen (`0x003229`), Game Type Menu (`0x00368A`), Level Menu Type B (`0x003AEB`), Game Type B Height Patch (`0x00496D`), In-Game Playfield Frame (`0x003F4C`), Type B Level 9 Ending (`0x0049B6`), Type B Ending (`0x004E17`), Type A Ending (`0x005278`), and Type A 120k Cathedral Patch (`0x0028DC`).
+  - **Attribute Palette & Universal Background Handling**: Fixed 16x16 attribute quadrant decoding, mapped universal background color (`palette_bytes[0]`) cleanly, and rendered transparency for `0xFF` sky tiles, eliminating black sky artifacts.
+  - **OAM Multi-Tile Rocket Extraction**: Extracted authentic multi-tile rocket definitions and thruster flame animations across all 5 score tiers directly from CHR Bank 2/Bank 0 data.
+  - **Pixel-Aligned Menu Cursors & Authentic Flicker**:
+    - Aligned Game Type cursor arrows (X: 63/159, Y: 63) and Music Type cursor arrows (X: 103, Y: 143 + m*16) with Tile `$27` left/right arrow pairs.
+    - Aligned Level 0-9 16x16 cursor (X: 52 + col*16, Y: 83/99) and Height 0-5 16x16 cursor (X: 156 + col*16, Y: 83/99).
+    - Aligned High Score Entry 8x8 solid box cursor (Tile `$FC`, X: 72 + char*8, Y: 152/168/184) rendered in red attribute behind active character.
+    - Implemented authentic `(timer & 0x03) != 0` 4-frame cycle OAM sprite flicker across all menu screens.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with 15/15 test suites passing cleanly.
+- **Audio Fidelity, Font Glyphs, Alignment & Widescreen Refactor**:
+  - **APU Audio Fidelity & Gain Staging**: Fixed big-endian APU timer period table decoding in `get_timer_period_for_note()` (`lo | ((hi & 0x07) << 8)`), resolving sub-bass distortion. Balanced channel gain weights (Pulse 1: 0.25, Pulse 2: 0.25, Triangle: 0.28, Noise: 0.12, sum = 0.90 <= 1.0) preventing clipping. Set buffer length to 150ms with batch `push_buffer()` eliminating underruns.
+  - **Authentic Font Glyphs & Text De-Duplication**: Extracted authentic 8x8 font glyphs from CHR Bank 3 into `ContentRegistry`. Implemented `_draw_nes_text()` and eliminated duplicate static HUD labels (`LINES`, `TOP`, `SCORE`, `LEVEL`, `STATISTICS`, piece labels) and artificial "PUSH START BUTTON" text.
+  - **Playfield & Preview Realignment**: Corrected playfield vertical offset from `PLAYFIELD_OFFSET_Y = 40` to `48` (PPU row 6 = `$20CC`), eliminating top border overlap and bottom gap. Aligned preview anchors (`O`: 208,120; `I`: 208,124; `T,J,L,S,Z`: 204,120) and statistics rows (96..192).
+  - **Dynamic Widescreen & Fullscreen**: Set `canvas_items` + `expand` in `project.godot`. Dynamically centered 256x240 game stage across any aspect ratio, tiling outer widescreen area seamlessly with authentic CHR Bank 3 interlocking border tile `0x77`, with `F11` and `Alt+Enter` fullscreen toggle.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **15/15 test suites passing cleanly**.
+- **Dynamic VirtualGamepad Anchoring, Seamless Interlocking Pattern & Clean Digits**:
+  - **Dynamic Edge Anchoring & Direct Hitbox Calibration**: Implemented dynamic anchoring for `VirtualGamepad` calculating D-Pad (bottom-left), B/A buttons (bottom-right), and Select/Start (bottom-center) relative to actual viewport dimensions (`get_viewport().get_visible_rect().size`), eliminating coordinate desync under `canvas_items` + `expand` and providing 1:1 direct touch hit-testing.
+  - **Intelligent Auto-Hide / Auto-Show**: Automatically hides virtual controls on physical keyboard (`InputEventKey`) or hardware joypad (`InputEventJoypadButton`, `InputEventJoypadMotion` > deadzone) input, and automatically shows controls on touchscreen touch events (`InputEventScreenTouch`).
+  - **Authentic Multi-Tile Interlocking Background Pattern**: Extracted authentic 32x16 interlocking brick pattern sampled directly from in-game nametable border (`0x003F4C`, rows 0-1, cols 20-23) in CHR Bank 3 with Palette 3, phase-locked to `stage_origin` with zero seams and zero stretching.
+  - **Clean HUD Digits**: Blanked out baked-in `000000` placeholder tiles in background nametables (`nt_game_a`, `nt_game_b`) and added opaque black backing rects in `_draw_hud()` before rendering dynamic font glyphs, completely eliminating double-drawn digit ghosting.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **15/15 test suites passing cleanly**.
+- **Noise Audio Engine Fix, Authentic TOP Score Mechanics & Dual-Palette Widescreen Tiling**:
+  - **Noise Audio Engine Fix**: Corrected noise channel PRG-ROM table indexing in `music_bytecode_player.gd` by reading directly from `$E5AB + noise_idx` (eliminating the erroneous `noise_idx * 3` multiplier that read invalid memory). Implemented authentic 16-entry `NOISE_PERIOD_TABLE` and periodic noise feedback mode. Added exponential hardware envelope decay (`volume *= 0.60` per frame), resolving harsh static/crackling in Music 1 and Music 2. Shifted LFSR output to centered bipolar AC and balanced channel mix weights (`0.25 + 0.25 + 0.28 + 0.08 = 0.86 <= 1.0`).
+  - **Authentic TOP Score Mechanics**: Initialized `top_score` from `HighScoreManager` (`10000` for A-TYPE, `2000` for B-TYPE). Removed live incrementing of `top_score` during active play from `_process()` and `_on_score_updated()`, ensuring `TOP` stays fixed at the saved high score and only updates upon game completion or mode restart. Verified soft-drop adds strictly +1 point per dropped cell.
+  - **Dual-Palette Widescreen Tiling & Seamless Puzzle Pattern**: Designed a 64x64 multi-tile puzzle pattern cluster composed exclusively of complete 1x1, 1x2, 2x1, and 2x2 blocks using authentic CHR Bank 3 tiles (`0x70, 0x71, 0x80, 0x81, 0x79, 0x7A, 0x67, 0x87, 0x78`). Generated `background_pattern_menu_texture` (`menu_palette`) and `background_pattern_game_texture` (`game_palette`), dynamically selecting between menu and in-game palettes with zero seams or broken edges.
+- **Menu Yellow Border Elimination, Authentic Nametable Reflection & APU Fidelity Audit**:
+  - **Menu Yellow Border Elimination**: Identified that `menu_palette` at `$9731` has yellow in Palette 0 (used for center header banners), while outer perimeter attributes in `nt_game_type` (`0x00368A`) and `nt_level` (`0x003AEB`) are `0xAA` (Palette 2: grey & white). Removed synthetic `PATTERN_GRID` and yellow `menu_bg_pal`. Extracted authentic 64x16 border regions directly from decompressed `type_img` (Palette 2 grey & white) and `game_a_img` (Palette 3 cyan & grey), eliminating yellow borders completely.
+  - **Seamless Nametable Reflection Tiling**: Generated 128x64 mirrored textures (`background_pattern_menu_texture`, `background_pattern_game_texture`) with horizontal and vertical reflections across 64x16 base regions, ensuring continuous boundaries and zero seams across any widescreen aspect ratio.
+  - **2A03 APU Fidelity Audit**:
+    - Fixed volume envelope frame counter overrun: `musicChanVolFrameCounter` halts on `$FF` (sustain) and `$F0` (mute) in `main.asm:6882-6916`, preventing counter from overrunning into random PRG-ROM data.
+    - Implemented Triangle channel linear counter articulation: muting channel on final frame of note (`ch.note_duration_remaining == 1`), producing authentic staccato note separation.
+    - Emulated 2A03 APU Pulse duty cycle sequencer phase reset on note trigger (`SQ1_HI`/`SQ2_HI` write behavior).
+    - Isolated SFX channel cleanup: ensuring Pulse 1 SFX (shift, rotate, lock) completion never prematurely mutes the music Noise channel.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **15/15 test suites passing cleanly**.
+- **Phase 15 Completion (EGM Theme Integration, Non-Mirrored Widescreen Puzzle Cluster & Soft-Drop Scoring Audit)**:
+  - **EGM (Elephant and Goldfish) Theme Integration**:
+    - Extracted brand tokens `#1B6EF3` (Elephant Blue), `#E86E00` (Goldfish Orange), and `#FFFFFF` (White) along with official vector and bitmap icons from `/root/.gemini/config/plugins/egm/`.
+    - Integrated `res://mods/palettes/egm.json` and `res://mods/skins/egm/` (`skin.json`, `tiles.png`, `icon.svg`, `icon.png`).
+    - Designed 32x8 skin sheet with Tile 1 Elephant trunk contour, Tile 2 Goldfish fin wave, and Tile 3 Dual EGM jewel core.
+    - Added built-in presets in `src/core/mod_loader.gd` for fallback activation without external disk dependencies, including procedural fallback generation in `_generate_egm_tiles()`.
+  - **Seamless Non-Mirrored 128x128 Widescreen Puzzle Cluster**:
+    - Eliminated mirrored vertical pillar/ladder seam artifacts caused by horizontal/vertical mirroring of 64x16 strips.
+    - Designed and validated a 16x16 tile (128x128 px) non-mirrored puzzle cluster using authentic interlocking tiles from CHR Bank 3 (`0x66`–`0x89`), consisting of complete 2x2 squares, 1x2/1x3/1x4 horizontal bars, 2x1/3x1/4x1 vertical bars, L-trominoes, and J-trominoes with verified modulo-16 wrapping across both X and Y axes.
+    - Extracted dual-palette variants: `background_pattern_menu_texture` (menu palette 2 grey & white highlights) and `background_pattern_game_texture` (game palette 3 grey & cyan highlights).
+    - Phase-locked tiling to `stage_origin` in `PlayfieldRenderer._draw_outer_widescreen_background()` for seamless alignment with centered 256x240 NES viewport.
+  - **Soft-Drop Scoring Audit Against `TetrisNESDisasm/`**:
+    - Verified exact disassembly mechanics (`main.asm:1569`, `1559`, `3436`): `inc holdDownPoints` runs during 2-frame soft-drop step; releasing Down immediately clears `holdDownPoints` to 0; upon piece lock, `addHoldDownPoints` evaluates `cmp #$02; bmi addLineClearPoints; dec score; adc score`, awarding `holdDownPoints - 1` points.
+    - Refactored `PieceController` and `GameStateMachine`: eliminated mid-air score incrementing, tracked `drop_points` that reset on Down release, and awarded points strictly on piece lock via `get_and_clear_drop_points()`.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **15/15 test suites passing cleanly**.
+- **Phase 16 Completion (Clean-Room Authenticity Restoration: ModLoader Removal, Drop SFX Elimination & Menu Margin Colors)**:
+  - **Complete Removal of Mod Loader & Custom Skins Subsystem**:
+    - Deleted `src/core/mod_loader.gd`, `tests/test_mod_loader.gd`, and the `mods/` directory.
+    - Removed `ModLoader` autoload from `project.godot`.
+    - Removed all mod hooks, backup tables, and custom appearance overrides from `src/core/content_registry.gd`.
+    - Removed `mod_applied` and `mods_reset` signals from `src/core/event_bus.gd` and stripped mod initialization from `src/main.gd`.
+    - Restored pure clean-room 1989 NES Tetris simulation with zero custom skins or palettes.
+  - **Elimination of Erroneous Drop / Gravity Sound Effects**:
+    - Audited `TetrisNESDisasm/main.asm` lines 1470-1670: confirmed `drop_tetrimino` never writes to `soundEffectSlot1Init` during falling or soft-drop (only horizontal shift `shift_tetrimino` writes `#$03` and rotation `rotate_tetrimino` writes `#$05`).
+    - Added `signal piece_shifted` in `EventBus`, emitted exclusively on successful horizontal DAS shifts.
+    - Rewired `AudioManager` so `_on_piece_shifted` triggers `play_sfx(SFX.SHIFT)`, while vertical falling (`_on_piece_moved`) remains completely silent.
+  - **Title Screen & Menu Widescreen Colors & Tile Continuity**:
+    - Eliminated blue background margins on Title Screen and all menu screens by re-mapping `menu_pal_2` in `chr_extractor.gd` to white highlight (`$30`) and grey body (`$00`) on black background (`$0F`).
+    - Designed and verified a 16x16 tile widescreen puzzle cluster composed exclusively of closed, authentic NES Tetris polyominoes from CHR Bank 3: 2x2 squares (`0x70, 0x71` over `0x80, 0x81`), 1x2/1x3/1x4 horizontal bars (`0x78`, `0x79...`, `0x7A`), and 2x1/3x1/4x1 vertical bars (`0x67`, `0x77...`, `0x87`) with 0 seam errors.
+    - Added `State.MENU` to `GameStateMachine` and enforced `is_menu = true` on `TITLE_SCREEN`, `GAME_TYPE_MENU`, `LEVEL_MENU`, `HIGH_SCORE_ENTRY`, and `HIGH_SCORE_TABLE` in `PlayfieldRenderer`.
+  - **Headless Verification**: Ran `godot --headless --path . --quit` and full automated test suite `godot --headless -s tests/test_runner.gd` with **14/14 test suites passing cleanly**.
+  - **Next Target Milestone**: Netplay multiplayer / dual-board competition mode.
