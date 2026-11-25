@@ -133,6 +133,12 @@ func _ready() -> void:
 	_init_audio_stream()
 	_connect_event_bus()
 
+func _exit_tree() -> void:
+	playback = null
+	if stream_player != null:
+		stream_player.stop()
+		stream_player.stream = null
+
 func _init_audio_stream() -> void:
 	if not is_inside_tree():
 		return
@@ -193,10 +199,22 @@ func get_timer_period_for_note(note_idx: int) -> int:
 		return lo | ((hi & 0x07) << 8)
 	return 0x152 # Fallback to E4 if out of range
 
+## Returns authentic NES Tetris SQ1 SFX priority matching LE33B (main.asm:6312-6321).
+static func _get_sfx_priority(sfx_id: int) -> int:
+	match sfx_id:
+		SFX.GAME_OVER:
+			return 3
+		SFX.LINE_CLEAR, SFX.TETRIS, SFX.LEVEL_UP, SFX.MENU_START:
+			return 2
+		_:
+			return 1
+
 ## Plays an authentic procedural SFX.
 func play_sfx(sfx_id: int) -> void:
 	if not audio_enabled:
 		return
+
+	var new_prio: int = _get_sfx_priority(sfx_id)
 
 	var s: ActiveSFX = ActiveSFX.new()
 	s.sfx_id = sfx_id
@@ -239,6 +257,12 @@ func play_sfx(sfx_id: int) -> void:
 		_:
 			s.channel = "sq1"
 			s.max_frames = 10
+
+	# Authentic LE33B (main.asm:6312-6321): High-priority SQ1 SFX suppress low-priority SQ1 SFX
+	if s.channel == "sq1" and new_prio == 1:
+		for existing in active_sfx_list:
+			if existing.channel == "sq1" and _get_sfx_priority(existing.sfx_id) >= 2:
+				return
 
 	active_sfx_list.append(s)
 
@@ -316,15 +340,27 @@ func _apply_channel_states() -> void:
 
 ## Advances active SFX animation at 60 Hz simulation tick.
 func _update_sfx() -> void:
+	var best_sq1_prio: int = -1
+	var active_sq1_sfx: ActiveSFX = null
+	var scan_idx: int = active_sfx_list.size() - 1
+	while scan_idx >= 0:
+		var cand: ActiveSFX = active_sfx_list[scan_idx]
+		if cand.channel == "sq1":
+			var p: int = _get_sfx_priority(cand.sfx_id)
+			if p > best_sq1_prio:
+				best_sq1_prio = p
+				active_sq1_sfx = cand
+		scan_idx -= 1
+
 	var idx: int = active_sfx_list.size() - 1
 	while idx >= 0:
 		var sfx: ActiveSFX = active_sfx_list[idx]
 		sfx.frame += 1
+		var progress: float = float(sfx.frame) / float(sfx.max_frames)
 
-		if sfx.channel == "sq1":
+		if sfx == active_sq1_sfx:
 			sq1.enabled = true
 			sq1.duty = 2 # 50% square wave
-			var progress: float = float(sfx.frame) / float(sfx.max_frames)
 
 			match sfx.sfx_id:
 				SFX.SHIFT:
@@ -360,6 +396,8 @@ func _update_sfx() -> void:
 				SFX.MENU_START:
 					sq1.timer_period = 0x0FE if sfx.frame < 4 else 0x07F
 					sq1.volume = 0.6 * (1.0 - progress)
+		elif sfx.channel == "noise":
+			match sfx.sfx_id:
 				SFX.CURTAIN:
 					noise.enabled = true
 					noise.period = 0.002

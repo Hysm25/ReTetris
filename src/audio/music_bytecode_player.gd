@@ -28,6 +28,8 @@ class ChannelState:
 	var noise_period: float = 0.001
 	var is_periodic_noise: bool = false
 	var reset_phase: bool = false
+	var tri_linear_quarter_frames: int = 0
+	var tri_linear_hold: bool = false
 
 var channels: Array[ChannelState] = []
 var currently_playing_track: int = -1
@@ -172,9 +174,11 @@ func step_frame() -> void:
 			ch.vol_frame_counter = 0
 			_execute_channel_instructions(ch_idx)
 		else:
-			if ch_idx == 2 and ch.note_duration_remaining == 1:
-				# Authentic 2A03 APU Triangle linear counter expiration on final frame of note
-				ch.volume = 0.0
+			if ch_idx == 2 and not ch.tri_linear_hold:
+				# Authentic 2A03 APU Triangle linear counter ticks 4 quarter-frames per 60Hz frame (main.asm:7221)
+				ch.tri_linear_quarter_frames -= 4
+				if ch.tri_linear_quarter_frames <= 0:
+					ch.volume = 0.0
 			_update_channel_envelope(ch_idx)
 
 func _execute_channel_instructions(ch_idx: int) -> void:
@@ -272,6 +276,16 @@ func _execute_channel_instructions(ch_idx: int) -> void:
 							ch.timer_period = lo | ((hi & 0x07) << 8)
 							if ch_idx == 2: # Triangle
 								ch.volume = 0.4
+								# Authentic @applyDurationForTri (main.asm:7205-7231):
+								# Linear counter = min((duration - 1) * 4, 0x3C) unless control forces $FF hold
+								var ctrl_low: int = ch.vol_control & 0x1F
+								var ctrl_high: int = ch.vol_control & 0xC0
+								if ctrl_low != 0 or (ctrl_high != 0 and ctrl_high != 0xC0):
+									ch.tri_linear_hold = true
+									ch.tri_linear_quarter_frames = 0xFF
+								else:
+									ch.tri_linear_hold = false
+									ch.tri_linear_quarter_frames = mini(maxi(0, ch.note_duration - 1) * 4, 0x3C)
 							else: # Pulse 1 / Pulse 2
 								ch.duty = (ch.vol_base >> 6) & 3
 								ch.volume = float(ch.vol_base & 0x0F) / 15.0

@@ -13,6 +13,7 @@ static func run_tests() -> bool:
 	test_charge_and_repeat()
 	test_direction_reversal()
 	test_are_preservation()
+	test_wall_charge_and_down_inhibit()
 	print("  -> TestDAS: PASSED")
 	return true
 
@@ -82,3 +83,17 @@ static func test_are_preservation() -> void:
 	# Next active frame: holding right triggers immediate repeat on frame 0 of new piece!
 	var shift: int = das.process_input(Constants.BUTTON_RIGHT, 0)
 	assert(shift == 1, "Pre-charged DAS must shift immediately upon piece entry")
+
+static func test_wall_charge_and_down_inhibit() -> void:
+	var das = DASHandler.new()
+	# Initial press -> counter = 0
+	das.process_input(Constants.BUTTON_LEFT, Constants.BUTTON_LEFT)
+	assert(das.das_counter == 0)
+
+	# Simulate wall collision -> authentic wall charge sets counter to DAS_INITIAL_DELAY (16)
+	das.on_wall_collision()
+	assert(das.das_counter == Constants.DAS_INITIAL_DELAY, "Wall collision must set DAS counter to 16")
+
+	# Holding Down inhibits horizontal shift per main.asm:1619-1621
+	var blocked_shift: int = das.process_input(Constants.BUTTON_LEFT | Constants.BUTTON_DOWN, Constants.BUTTON_LEFT)
+	assert(blocked_shift == 0, "Holding Down must inhibit horizontal shifting")

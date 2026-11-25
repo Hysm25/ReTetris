@@ -15,9 +15,18 @@ func reset() -> void:
 	das_counter = 0
 	active_direction = 0
 
+## Authentic NES Tetris wall-charge reset (main.asm:1661-1665):
+## When a horizontal shift is blocked by a wall or stack, autorepeatX is set to DAS_RESET (16).
+func on_wall_collision() -> void:
+	das_counter = Constants.DAS_INITIAL_DELAY
+
 ## Updates DAS state given current controller buttons bitmask.
 ## Returns column movement delta: -1 (shift left), +1 (shift right), or 0 (no shift).
 func process_input(held_buttons: int, newly_pressed_buttons: int) -> int:
+	# Authentic NES Tetris (main.asm:1619-1621): holding Down inhibits horizontal shifting
+	if (held_buttons & Constants.BUTTON_DOWN) != 0:
+		return 0
+
 	var left_pressed: bool = (newly_pressed_buttons & Constants.BUTTON_LEFT) != 0
 	var right_pressed: bool = (newly_pressed_buttons & Constants.BUTTON_RIGHT) != 0
 	var left_held: bool = (held_buttons & Constants.BUTTON_LEFT) != 0

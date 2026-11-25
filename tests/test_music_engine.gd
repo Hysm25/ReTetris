@@ -199,6 +199,15 @@ static func test_bytecode_execution_and_envelope_stepping() -> void:
 
 	assert(had_audio, "Stepping music bytecode must produce non-zero channel volumes")
 
+	# Verify Triangle linear-counter staccato cutoff math: min((duration - 1) * 4, 0x3C)
+	# For a 24-frame note (half note at 150bpm) with vol_control=0x00, linear counter is capped at 0x3C (15 frames)
+	var tri = player.channels[2]
+	tri.vol_control = 0x00
+	tri.note_duration = 24
+	tri.tri_linear_hold = false
+	tri.tri_linear_quarter_frames = mini((tri.note_duration - 1) * 4, 0x3C)
+	assert(tri.tri_linear_quarter_frames == 60, "24-frame triangle note linear counter must cap at 0x3C (60 quarter-frames)")
+
 static func test_audio_manager_bytecode_integration_and_sfx_override() -> void:
 	var res: Dictionary = get_test_extraction()
 	if res.is_empty():

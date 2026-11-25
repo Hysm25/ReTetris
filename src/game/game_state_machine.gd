@@ -115,6 +115,8 @@ func _spawn_piece(type: int) -> void:
 ## Advances one frame of the simulation.
 ## Reads controller button bitmasks (held and newly pressed).
 func step_frame(held_buttons: int, newly_pressed_buttons: int) -> void:
+	if randomizer != null:
+		randomizer.tick_frame()
 	match current_state:
 		State.ACTIVE_PLAY:
 			_process_active_play(held_buttons, newly_pressed_buttons)
@@ -150,6 +152,8 @@ func _process_active_play(held_buttons: int, newly_pressed_buttons: int) -> void
 		if piece.shift(shift_dx, grid):
 			_emit_piece_shifted(piece.piece_type, piece.position, piece.orientation)
 			_emit_piece_moved(piece.piece_type, piece.position, piece.orientation)
+		else:
+			das.on_wall_collision()
 
 	# 3. Gravity and Soft Drop (neither triggers SFX in authentic 1989 NES Tetris)
 	var down_held: bool = (held_buttons & Constants.BUTTON_DOWN) != 0

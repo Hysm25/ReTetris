@@ -16,6 +16,7 @@ static func run_tests() -> bool:
 	test_event_bus_handlers()
 	test_big_endian_timer_period_lookup()
 	test_non_clipping_gain_staging()
+	test_sfx_priority_and_noise_sfx()
 	print("  -> TestAudio: PASSED")
 	return true
 
@@ -191,5 +192,31 @@ static func test_non_clipping_gain_staging() -> void:
 	for s in buffer:
 		# With weights 0.25 + 0.25 + 0.28 + 0.08 = 0.86, peak sample should never exceed 0.86
 		assert(absf(s) <= 0.87, "Audio gain staging must prevent digital clipping (<= 0.87), got %f" % absf(s))
+	audio.free()
+
+static func test_sfx_priority_and_noise_sfx() -> void:
+	var audio = AudioManager.new()
+	audio.audio_enabled = true
+
+	# High-priority TETRIS suppresses low-priority SHIFT/ROTATE/LOCK (LE33B main.asm:6312)
+	audio.play_sfx(AudioManager.SFX.TETRIS)
+	assert(audio.get_active_sfx_count() == 1)
+	audio.play_sfx(AudioManager.SFX.SHIFT)
+	audio.play_sfx(AudioManager.SFX.ROTATE)
+	audio.play_sfx(AudioManager.SFX.LOCK)
+	assert(audio.get_active_sfx_count() == 1, "Low-priority SQ1 SFX must be suppressed while TETRIS is active")
+
+	# Noise SFX (CURTAIN / ROCKET) must activate noise channel
+	audio.clear_sfx()
+	audio.play_sfx(AudioManager.SFX.CURTAIN)
+	audio._update_sfx()
+	assert(audio.noise.enabled, "SFX.CURTAIN must enable noise channel")
+	assert(audio.noise.volume > 0.0, "SFX.CURTAIN must set positive noise volume")
+
+	audio.clear_sfx()
+	audio.play_sfx(AudioManager.SFX.ROCKET)
+	audio._update_sfx()
+	assert(audio.noise.enabled, "SFX.ROCKET must enable noise channel")
+	assert(audio.noise.volume > 0.0, "SFX.ROCKET must set positive noise volume")
 	audio.free()
 
