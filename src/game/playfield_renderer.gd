@@ -141,9 +141,8 @@ func _draw() -> void:
 	var vp_size: Vector2 = get_viewport_rect().size
 	var stage_origin: Vector2 = ((vp_size - Vector2(float(Constants.SCREEN_WIDTH), float(Constants.SCREEN_HEIGHT))) * 0.5).floor()
 
-	# 1. Seamless Widescreen / Fullscreen Background Tiling
-	if vp_size.x > float(Constants.SCREEN_WIDTH) or vp_size.y > float(Constants.SCREEN_HEIGHT):
-		_draw_outer_widescreen_background(vp_size, stage_origin)
+	# 1. Seamless Widescreen / Native Background Tiling (rendered behind stage so transparent nametable margins blend seamlessly)
+	_draw_outer_widescreen_background(vp_size, stage_origin)
 
 	# 2. Transform into centered 256x240 stage coordinate space
 	draw_set_transform(stage_origin, 0.0, Vector2.ONE)

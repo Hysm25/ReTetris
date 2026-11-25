@@ -1,8 +1,8 @@
 # Project Status (`docs/STATUS.md`)
 
 ## Current Phase
-- **Clean-Room Authenticity Restoration: ModLoader Removal, Erroneous Drop SFX Removal & Title Screen Widescreen Color Fix (Completed)**
-  - **Context**: Fully eliminated the ModLoader and custom skin/palette modding subsystems (`src/core/mod_loader.gd`, `tests/test_mod_loader.gd`, and `mods/`), returning the engine to 100% authentic, uncompromised 1989 NES Tetris. Audited disassembly (`TetrisNESDisasm/main.asm:1530-1600`) and eliminated erroneous sound effects triggered on vertical falling/soft-drop, ensuring only horizontal DAS shifts emit `piece_shifted` and trigger `SFX.SHIFT`. Fixed blue background margins on Title Screen and menu screens by mapping `menu_pal_2` to authentic white highlight (`$30`) and grey body (`$00`) with black background, and verified a 16x16 widescreen puzzle cluster of fully-closed polyominoes (2x2 squares, 1x2/1x3/1x4 horizontal bars, 2x1/3x1/4x1 vertical bars) with zero unclosed seams.
+- **Seamless Widescreen Interlocking Polyominoes & Boundary Blending (Completed)**
+  - **Context**: Upgraded `WIDESCREEN_PUZZLE_CLUSTER_16X16` in `src/importer/chr_extractor.gd` from plain 2x2/1xN/Nx1 bricks to a 64-tetromino interlocking maze (12 T, 12 L, 13 J, 11 S, 10 Z, 2 O, 4 I) utilizing all 18 authentic CHR Bank 3 puzzle tiles (`0x67`, `0x70`–`0x75`, `0x77`–`0x7A`, `0x80`–`0x85`, `0x87`), including genuine inner-corner and T-junction tiles (`0x72`–`0x75`, `0x82`–`0x85`), with zero modulo-16 seam errors. Eliminated the 256x240 vertical/horizontal boundary cut seam by flood-filling perimeter-connected puzzle tiles (`BANK0_PUZZLE_TILES` and `BANK3_PUZZLE_TILES`) with transparent pixels (`alpha = 0`) in `render_nametable_image()` and rendering `_draw_outer_widescreen_background()` unconditionally behind the stage in `PlayfieldRenderer._draw()`.
   - **Rule**: Strictly typed GDScript, 60 TPS simulation loop, zero copyrighted assets, fully automated headless verification.
   - **Completed Foundation**:
     1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
@@ -20,6 +20,21 @@
     13. Menu Yellow Border Elimination, Authentic Nametable Reflection & APU Fidelity Audit (`chr_extractor.gd`, `music_bytecode_player.gd`, `audio_manager.gd`, `playfield_renderer.gd`)
     14. Soft-Drop Scoring Audit Against Disassembly & Polyomino Tiling (`piece_controller.gd`, `game_state_machine.gd`, `chr_extractor.gd`)
     15. Clean-Room Authenticity Restoration (`project.godot`, `content_registry.gd`, `audio_manager.gd`, `chr_extractor.gd`, `playfield_renderer.gd`)
+    16. Seamless Widescreen Interlocking Polyominoes & Boundary Blending (`chr_extractor.gd`, `playfield_renderer.gd`, `test_importer.gd`)
+
+---
+
+## Seamless Widescreen Interlocking Polyominoes & Boundary Blending (Completed)
+
+### 1. Authentic Complex Polyomino Cluster (`src/importer/chr_extractor.gd`)
+- [x] Rebuilt `WIDESCREEN_PUZZLE_CLUSTER_16X16` (16x16 tiles / 128x128 px) as a mathematically verified 64-tetromino torus tiling (12 T, 12 L, 13 J, 11 S, 10 Z, 2 O, 4 I) using all 18 authentic CHR Bank 3 puzzle tiles (`0x67`, `0x70`–`0x75`, `0x77`–`0x7A`, `0x80`–`0x85`, `0x87`), including genuine inner-corner and T-junction tiles (`0x72`–`0x75`, `0x82`–`0x85`).
+- [x] Verified modulo-16 horizontal and vertical wraparound with 0 pixel boundary seam mismatches.
+
+### 2. Zero-Seam 256x240 Boundary Blending (`src/importer/chr_extractor.gd` & `src/game/playfield_renderer.gd`)
+- [x] Added `_compute_perimeter_transparent_mask()` and optional `transparent_tiles` parameter to `render_nametable_image()`.
+- [x] Flood-filled perimeter-connected puzzle background tiles (`BANK0_PUZZLE_TILES` for Title, Game Type, Level A/B, High Scores, Enter High Score; `BANK3_PUZZLE_TILES` for In-Game A/B) with `alpha = 0`, preserving opaque UI boxes, Title logo/black halo, and ending nametables (`[]`).
+- [x] Updated `PlayfieldRenderer._draw()` to call `_draw_outer_widescreen_background()` unconditionally behind the stage so the continuous puzzle grid flows seamlessly across both native 256x240 and widescreen aspect ratios without any X=0 or X=256 vertical cut seam.
+- [x] Added `test_widescreen_polyomino_cluster_and_seamless_margins()` in `tests/test_importer.gd` and verified **14/14 test suites passing cleanly**.
 
 ---
 

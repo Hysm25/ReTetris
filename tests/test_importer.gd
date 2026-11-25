@@ -18,6 +18,7 @@ static func run_tests() -> bool:
 	test_rom_checksum_validation()
 	test_100_percent_data_extraction()
 	test_content_registry_and_audio_injection()
+	test_widescreen_polyomino_cluster_and_seamless_margins()
 	test_persistence_and_auto_ingestion()
 	print("  -> TestImporter: PASSED")
 	return true
@@ -228,6 +229,62 @@ static func test_content_registry_and_audio_injection() -> void:
 	reg.reset_custom_textures()
 	reg.free()
 	aud.free()
+
+static func test_widescreen_polyomino_cluster_and_seamless_margins() -> void:
+	# 1. Verify WIDESCREEN_PUZZLE_CLUSTER_16X16 uses authentic L/J/T/S/Z junction tiles
+	var cluster: Array = CHRExtractor.WIDESCREEN_PUZZLE_CLUSTER_16X16
+	assert(cluster.size() == 16, "Cluster must have 16 rows")
+	var used_tiles: Dictionary = {}
+	for r in range(16):
+		assert(cluster[r].size() == 16, "Cluster row %d must have 16 cols" % r)
+		for c in range(16):
+			used_tiles[cluster[r][c]] = true
+
+	# Must include authentic inner corner & T-junction tiles (0x72..0x75, 0x82..0x85)
+	for j_tile in [0x72, 0x73, 0x74, 0x75, 0x82, 0x83, 0x84, 0x85]:
+		assert(used_tiles.has(j_tile), "Cluster must include authentic junction tile 0x%02X" % j_tile)
+
+	var rom_path: String = "Tetris (USA).nes"
+	if not FileAccess.file_exists(rom_path):
+		return
+
+	var res: Dictionary = CHRExtractor.extract_from_file(rom_path, true)
+	assert(res.success == true)
+	var bank3: PackedByteArray = res.chr_bank_3_game
+
+	# 2. Verify zero pixel seam discontinuities across all 16x16 tiles (including wraparound)
+	var decoded_tiles: Dictionary = {}
+	for t in used_tiles.keys():
+		decoded_tiles[t] = CHRExtractor.decode_tile_2bpp(bank3.slice(t * 16, (t + 1) * 16))
+
+	for r in range(16):
+		for c in range(16):
+			var px: PackedByteArray = decoded_tiles[cluster[r][c]]
+			var px_r: PackedByteArray = decoded_tiles[cluster[r][(c + 1) % 16]]
+			var px_b: PackedByteArray = decoded_tiles[cluster[(r + 1) % 16][c]]
+			var open_r: bool = (px[3 * 8 + 7] != 0)
+			var open_l_of_r: bool = (px_r[3 * 8 + 0] == 2)
+			assert(open_r == open_l_of_r, "Horizontal seam mismatch at (%d, %d)" % [r, c])
+			var open_b: bool = (px[7 * 8 + 3] != 0)
+			var open_t_of_b: bool = (px_b[0 * 8 + 3] == 2)
+			assert(open_b == open_t_of_b, "Vertical seam mismatch at (%d, %d)" % [r, c])
+
+	# 3. Verify perimeter transparency (zero vertical/horizontal cut seam at 256x240 boundaries)
+	for img_key in ["title_img", "type_img", "lvl_a_img", "lvl_b_img", "high_img", "enter_img", "game_a_img", "game_b_img"]:
+		var img: Image = res[img_key] as Image
+		assert(img != null, "%s must exist" % img_key)
+		# Check corners and midpoints on col 0, col 31, row 0, row 29
+		assert(img.get_pixel(0, 0).a == 0.0, "%s top-left perimeter must be transparent" % img_key)
+		assert(img.get_pixel(255, 0).a == 0.0, "%s top-right perimeter must be transparent" % img_key)
+		assert(img.get_pixel(0, 120).a == 0.0, "%s left perimeter must be transparent" % img_key)
+		assert(img.get_pixel(255, 120).a == 0.0, "%s right perimeter must be transparent" % img_key)
+		assert(img.get_pixel(128, 239).a == 0.0, "%s bottom perimeter must be transparent" % img_key)
+
+	# 4. Verify inner UI/playfield & ending screens remain opaque
+	var game_a_img: Image = res["game_a_img"] as Image
+	assert(game_a_img.get_pixel(128, 120).a == 1.0, "In-game playfield interior must remain opaque")
+	var ending_img: Image = res["ending_img"] as Image
+	assert(ending_img.get_pixel(0, 0).a == 1.0, "Ending nametable must remain fully opaque")
 
 static func test_persistence_and_auto_ingestion() -> void:
 	var rom_path: String = "Tetris (USA).nes"
