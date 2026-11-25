@@ -2,7 +2,7 @@
 
 ## Current Phase
 - **Seamless Widescreen Interlocking Polyominoes & Boundary Blending (Completed)**
-  - **Context**: Upgraded `WIDESCREEN_PUZZLE_CLUSTER_16X16` in `src/importer/chr_extractor.gd` from plain 2x2/1xN/Nx1 bricks to a 64-tetromino interlocking maze (12 T, 12 L, 13 J, 11 S, 10 Z, 2 O, 4 I) utilizing all 18 authentic CHR Bank 3 puzzle tiles (`0x67`, `0x70`–`0x75`, `0x77`–`0x7A`, `0x80`–`0x85`, `0x87`), including genuine inner-corner and T-junction tiles (`0x72`–`0x75`, `0x82`–`0x85`), with zero modulo-16 seam errors. Eliminated the 256x240 vertical/horizontal boundary cut seam by flood-filling perimeter-connected puzzle tiles (`BANK0_PUZZLE_TILES` and `BANK3_PUZZLE_TILES`) with transparent pixels (`alpha = 0`) in `render_nametable_image()` and rendering `_draw_outer_widescreen_background()` unconditionally behind the stage in `PlayfieldRenderer._draw()`.
+  - **Context**: Upgraded `WIDESCREEN_PUZZLE_CLUSTER_16X16` in `src/importer/chr_extractor.gd` from plain 2x2/1xN/Nx1 bricks to a 64-tetromino interlocking maze (12 T, 12 L, 13 J, 11 S, 10 Z, 2 O, 4 I) utilizing all 18 authentic CHR Bank 3 puzzle tiles (`0x67`, `0x70`–`0x75`, `0x77`–`0x7A`, `0x80`–`0x85`, `0x87`), including genuine inner-corner and T-junction tiles (`0x72`–`0x75`, `0x82`–`0x85`), with zero modulo-16 seam errors. Eliminated the 256x240 vertical boundary cut seam while preserving 100% authentic interior UI framing by restricting transparency (`alpha = 0`) strictly to puzzle background tiles on the outermost perimeter columns (`col == 0` and `col == 31`) in `render_nametable_image()`, keeping all interior nametable tiles (`cols 1..30`, `rows 0..29`) completely intact and opaque.
   - **Rule**: Strictly typed GDScript, 60 TPS simulation loop, zero copyrighted assets, fully automated headless verification.
   - **Completed Foundation**:
     1. Core Autoloads & Enums (`constants.gd`, `event_bus.gd`, `content_registry.gd`)
@@ -31,10 +31,10 @@
 - [x] Verified modulo-16 horizontal and vertical wraparound with 0 pixel boundary seam mismatches.
 
 ### 2. Zero-Seam 256x240 Boundary Blending (`src/importer/chr_extractor.gd` & `src/game/playfield_renderer.gd`)
-- [x] Added `_compute_perimeter_transparent_mask()` and optional `transparent_tiles` parameter to `render_nametable_image()`.
-- [x] Flood-filled perimeter-connected puzzle background tiles (`BANK0_PUZZLE_TILES` for Title, Game Type, Level A/B, High Scores, Enter High Score; `BANK3_PUZZLE_TILES` for In-Game A/B) with `alpha = 0`, preserving opaque UI boxes, Title logo/black halo, and ending nametables (`[]`).
-- [x] Updated `PlayfieldRenderer._draw()` to call `_draw_outer_widescreen_background()` unconditionally behind the stage so the continuous puzzle grid flows seamlessly across both native 256x240 and widescreen aspect ratios without any X=0 or X=256 vertical cut seam.
-- [x] Added `test_widescreen_polyomino_cluster_and_seamless_margins()` in `tests/test_importer.gd` and verified **14/14 test suites passing cleanly**.
+- [x] Added optional `transparent_tiles` parameter to `render_nametable_image()`.
+- [x] Restricted transparency (`alpha = 0`) strictly to puzzle background tiles (`BANK0_PUZZLE_TILES` for Title, Game Type, Level A/B, High Scores, Enter High Score; `BANK3_PUZZLE_TILES` for In-Game A/B) in the outermost perimeter columns (`col == 0` and `col == 31`), keeping the entire interior (`cols 1..30`, `rows 0..29`) 100% intact and opaque so puzzle blocks around UI boxes and the Title logo preserve their exact original NES termination and framing.
+- [x] Updated `PlayfieldRenderer._draw()` to call `_draw_outer_widescreen_background()` unconditionally behind the stage so the outer `col 0` / `col 31` margins blend seamlessly into the widescreen puzzle grid across both native 256x240 and widescreen aspect ratios.
+- [x] Updated `test_widescreen_polyomino_cluster_and_seamless_margins()` in `tests/test_importer.gd` verifying both `col 0`/`col 31` transparency and `cols 1..30` interior opacity, with **14/14 test suites passing cleanly**.
 
 ---
 

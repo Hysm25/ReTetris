@@ -92,7 +92,8 @@ const WIDESCREEN_PUZZLE_CLUSTER_16X16: Array[Array] = [
 ]
 
 # Background puzzle tile IDs used in CHR Bank 0 (Title/Menus) and CHR Bank 3 (In-Game) nametables.
-# Flood-filled from the 256x240 perimeter to render seamless transparency over the widescreen puzzle grid.
+# Outermost perimeter columns (col 0 and col 31) use these sets to blend into the widescreen puzzle grid
+# while keeping the entire interior (cols 1..30, rows 0..29) 100% intact and opaque.
 const BANK0_PUZZLE_TILES: Array[int] = [
 	0x40, 0x41, 0x42, 0x43,
 	0x60, 0x61, 0x62,
@@ -333,54 +334,18 @@ static func apply_ppu_patch(ppu: PackedByteArray, patch: PackedByteArray) -> voi
 				ppu[addr] = v
 			addr += 1
 
-## Computes a 960-byte (32x30) mask of perimeter-connected background puzzle tiles
-## so the underlying continuous widescreen puzzle grid flows seamlessly up to UI boxes and logos.
-static func _compute_perimeter_transparent_mask(nametable: PackedByteArray, transparent_tiles: Array[int]) -> PackedByteArray:
-	var mask: PackedByteArray = PackedByteArray()
-	mask.resize(960)
-	mask.fill(0)
-	if transparent_tiles.is_empty():
-		return mask
-
-	var tile_lookup: Dictionary = {}
-	for t in transparent_tiles:
-		tile_lookup[t] = true
-
-	var queue: Array[Vector2i] = []
-	for r in range(30):
-		for c in range(32):
-			if r == 0 or r == 29 or c == 0 or c == 31:
-				var idx: int = r * 32 + c
-				if tile_lookup.has(nametable[idx]):
-					mask[idx] = 1
-					queue.append(Vector2i(c, r))
-
-	var head: int = 0
-	var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
-	while head < queue.size():
-		var cur: Vector2i = queue[head]
-		head += 1
-		for d in dirs:
-			var nc: int = cur.x + d.x
-			var nr: int = cur.y + d.y
-			if nr >= 0 and nr < 30 and nc >= 0 and nc < 32:
-				var n_idx: int = nr * 32 + nc
-				if mask[n_idx] == 0 and tile_lookup.has(nametable[n_idx]):
-					mask[n_idx] = 1
-					queue.append(Vector2i(nc, nr))
-
-	return mask
-
 ## Renders a 1024-byte authentic NES nametable (960 tile IDs + 64 attributes)
 ## into a 256x240 Image using 2bpp tiles from a specified CHR bank and authentic palette.
-## If transparent_tiles is provided, perimeter-connected puzzle background tiles render with alpha = 0.
+## If transparent_tiles is provided, outermost perimeter columns (col 0 and col 31) matching those puzzle tiles render with alpha = 0.
 static func render_nametable_image(nametable: PackedByteArray, chr_bank: PackedByteArray, palette_bytes: PackedByteArray, transparent_tiles: Array[int] = []) -> Image:
 	var img: Image = Image.create(Constants.SCREEN_WIDTH, Constants.SCREEN_HEIGHT, false, Image.FORMAT_RGBA8)
 	var universal_bg_idx: int = palette_bytes[0] if palette_bytes.size() > 0 else 0x0F
 	var universal_bg: Color = Constants.NES_MASTER_PALETTE[universal_bg_idx]
 	img.fill(universal_bg)
 
-	var transparent_mask: PackedByteArray = _compute_perimeter_transparent_mask(nametable, transparent_tiles)
+	var transparent_lookup: Dictionary = {}
+	for t in transparent_tiles:
+		transparent_lookup[t] = true
 
 	var bg_palettes: Array[Array] = []
 	for p in range(4):
@@ -398,13 +363,13 @@ static func render_nametable_image(nametable: PackedByteArray, chr_bank: PackedB
 	for r in range(30):
 		for c in range(32):
 			var nt_idx: int = r * 32 + c
+			var tile_id: int = nametable[nt_idx]
 			var origin_x: int = c * 8
 			var origin_y: int = r * 8
-			if transparent_mask[nt_idx] == 1:
+			if (c == 0 or c == 31) and transparent_lookup.has(tile_id):
 				img.fill_rect(Rect2i(origin_x, origin_y, 8, 8), Color(0.0, 0.0, 0.0, 0.0))
 				continue
 
-			var tile_id: int = nametable[nt_idx]
 			if tile_id == 0xFF:
 				continue
 

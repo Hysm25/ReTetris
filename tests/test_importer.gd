@@ -269,22 +269,32 @@ static func test_widescreen_polyomino_cluster_and_seamless_margins() -> void:
 			var open_t_of_b: bool = (px_b[0 * 8 + 3] == 2)
 			assert(open_b == open_t_of_b, "Vertical seam mismatch at (%d, %d)" % [r, c])
 
-	# 3. Verify perimeter transparency (zero vertical/horizontal cut seam at 256x240 boundaries)
+	# 3. Verify ONLY outermost perimeter columns (col 0 and col 31) on puzzle tiles are transparent
 	for img_key in ["title_img", "type_img", "lvl_a_img", "lvl_b_img", "high_img", "enter_img", "game_a_img", "game_b_img"]:
 		var img: Image = res[img_key] as Image
 		assert(img != null, "%s must exist" % img_key)
-		# Check corners and midpoints on col 0, col 31, row 0, row 29
-		assert(img.get_pixel(0, 0).a == 0.0, "%s top-left perimeter must be transparent" % img_key)
-		assert(img.get_pixel(255, 0).a == 0.0, "%s top-right perimeter must be transparent" % img_key)
-		assert(img.get_pixel(0, 120).a == 0.0, "%s left perimeter must be transparent" % img_key)
-		assert(img.get_pixel(255, 120).a == 0.0, "%s right perimeter must be transparent" % img_key)
-		assert(img.get_pixel(128, 239).a == 0.0, "%s bottom perimeter must be transparent" % img_key)
+		# Col 0 (X: 0..7) and Col 31 (X: 248..255) must be transparent
+		assert(img.get_pixel(0, 0).a == 0.0, "%s col 0 top must be transparent" % img_key)
+		assert(img.get_pixel(0, 120).a == 0.0, "%s col 0 mid must be transparent" % img_key)
+		assert(img.get_pixel(0, 239).a == 0.0, "%s col 0 bottom must be transparent" % img_key)
+		assert(img.get_pixel(255, 0).a == 0.0, "%s col 31 top must be transparent" % img_key)
+		assert(img.get_pixel(255, 120).a == 0.0, "%s col 31 mid must be transparent" % img_key)
+		assert(img.get_pixel(255, 239).a == 0.0, "%s col 31 bottom must be transparent" % img_key)
+
+		# Interior columns (cols 1..30, rows 0..29) must remain 100% opaque
+		assert(img.get_pixel(12, 4).a == 1.0, "%s col 1 row 0 must remain opaque" % img_key)
+		assert(img.get_pixel(244, 4).a == 1.0, "%s col 30 row 0 must remain opaque" % img_key)
+		assert(img.get_pixel(128, 4).a == 1.0, "%s row 0 center must remain opaque" % img_key)
+		assert(img.get_pixel(128, 236).a == 1.0, "%s row 29 center must remain opaque" % img_key)
+		assert(img.get_pixel(12, 120).a == 1.0, "%s col 1 mid must remain opaque" % img_key)
+		assert(img.get_pixel(244, 120).a == 1.0, "%s col 30 mid must remain opaque" % img_key)
 
 	# 4. Verify inner UI/playfield & ending screens remain opaque
 	var game_a_img: Image = res["game_a_img"] as Image
 	assert(game_a_img.get_pixel(128, 120).a == 1.0, "In-game playfield interior must remain opaque")
 	var ending_img: Image = res["ending_img"] as Image
 	assert(ending_img.get_pixel(0, 0).a == 1.0, "Ending nametable must remain fully opaque")
+	assert(ending_img.get_pixel(255, 239).a == 1.0, "Ending nametable right edge must remain fully opaque")
 
 static func test_persistence_and_auto_ingestion() -> void:
 	var rom_path: String = "Tetris (USA).nes"
